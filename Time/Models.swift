@@ -23,6 +23,7 @@ struct NamedListItem: Identifiable, Hashable {
     var id: Int64
     var name: String
     var sortOrder: Int
+    var archived: Bool = false
 }
 
 typealias WorkTypeItem = NamedListItem

@@ -86,6 +86,30 @@ final class TimeStore: ObservableObject {
         return parts.joined(separator: " · ")
     }
 
+    var visibleClients: [ClientItem] {
+        clients.filter { !$0.archived }
+    }
+
+    var archivedClients: [ClientItem] {
+        clients.filter { $0.archived }
+    }
+
+    var archivedClientNames: Set<String> {
+        Set(archivedClients.map(\.name))
+    }
+
+    var visibleProjects: [ProjectItem] {
+        projects.filter { !$0.archived }
+    }
+
+    var archivedProjects: [ProjectItem] {
+        projects.filter { $0.archived }
+    }
+
+    var archivedProjectNames: Set<String> {
+        Set(archivedProjects.map(\.name))
+    }
+
     var todaySeconds: Int {
         let (start, end) = DateRangeKind.today.bounds(now: now)
         let finished = entries
@@ -207,8 +231,33 @@ final class TimeStore: ObservableObject {
         }, reload: reloadClients, label: "client")
     }
 
+    func archiveClient(_ item: ClientItem) {
+        do {
+            try db.setArchived(id: item.id, archived: true)
+            reloadClients()
+            if client == item.name {
+                client = ""
+                persistFormAndRunning()
+            }
+        } catch {
+            NSLog("Time: could not archive client: \(error)")
+        }
+    }
+
+    func unhideClient(_ item: ClientItem) {
+        do {
+            try db.setArchived(id: item.id, archived: false)
+            reloadClients()
+        } catch {
+            NSLog("Time: could not unhide client: \(error)")
+        }
+    }
+
     func rememberClient(_ raw: String? = nil) {
-        addClient(raw ?? client)
+        client = resolveTypedName(raw ?? client, items: clients) { name in
+            try db.insertClient(name: name, sortOrder: clients.count)
+            reloadClients()
+        }
     }
 
     func addProject(_ raw: String) {
@@ -230,8 +279,54 @@ final class TimeStore: ObservableObject {
         }, reload: reloadProjects, label: "project")
     }
 
+    func archiveProject(_ item: ProjectItem) {
+        do {
+            try db.setProjectArchived(id: item.id, archived: true)
+            reloadProjects()
+            if project == item.name {
+                project = ""
+                persistFormAndRunning()
+            }
+        } catch {
+            NSLog("Time: could not archive project: \(error)")
+        }
+    }
+
+    func unhideProject(_ item: ProjectItem) {
+        do {
+            try db.setProjectArchived(id: item.id, archived: false)
+            reloadProjects()
+        } catch {
+            NSLog("Time: could not unhide project: \(error)")
+        }
+    }
+
     func rememberProject(_ raw: String? = nil) {
-        addProject(raw ?? project)
+        project = resolveTypedName(raw ?? project, items: projects) { name in
+            try db.insertProject(name: name, sortOrder: projects.count)
+            reloadProjects()
+        }
+    }
+
+    private func resolveTypedName(
+        _ raw: String,
+        items: [NamedListItem],
+        insert: (String) throws -> Void
+    ) -> String {
+        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if name.isEmpty { return "" }
+        if let match = items.first(where: { !$0.archived && $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
+            return match.name
+        }
+        if items.contains(where: { $0.archived && $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
+            return ""
+        }
+        do {
+            try insert(name)
+        } catch {
+            NSLog("Time: could not remember name: \(error)")
+        }
+        return name
     }
 
     private func addNamed(
@@ -336,6 +431,8 @@ final class TimeStore: ObservableObject {
         client = db.setting("client") ?? ""
         project = db.setting("project") ?? ""
         billable = (db.setting("billable") ?? "0") == "1"
+        if archivedClientNames.contains(client) { client = "" }
+        if archivedProjectNames.contains(project) { project = "" }
     }
 
     private func reloadWorkTypes() {
@@ -484,6 +581,13 @@ final class TimeStore: ObservableObject {
     }
 
     func filteredEntries() -> [TimeEntry] {
-        entries(in: dateRange, customStart: customStart, customEnd: customEnd)
+        let hiddenClients = archivedClientNames
+        let hiddenProjects = archivedProjectNames
+        return entries(in: dateRange, customStart: customStart, customEnd: customEnd)
+            .filter { entry in
+                if !entry.client.isEmpty && hiddenClients.contains(entry.client) { return false }
+                if !entry.project.isEmpty && hiddenProjects.contains(entry.project) { return false }
+                return true
+            }
     }
 }

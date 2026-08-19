@@ -102,18 +102,9 @@ final class Database {
                 sort_order INTEGER NOT NULL
             );
             """)
-        guard tableHasColumn(table, "archived") else { return }
-        let simple = "\(table)_v1"
-        try exec("""
-            CREATE TABLE \(simple) (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL UNIQUE,
-                sort_order INTEGER NOT NULL
-            );
-            """)
-        try exec("INSERT OR IGNORE INTO \(simple)(id, name, sort_order) SELECT id, name, sort_order FROM \(table);")
-        try exec("DROP TABLE \(table);")
-        try exec("ALTER TABLE \(simple) RENAME TO \(table);")
+        if !tableHasColumn(table, "archived") {
+            try exec("ALTER TABLE \(table) ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;")
+        }
     }
 
     private func tableHasColumn(_ table: String, _ column: String) -> Bool {
@@ -259,9 +250,34 @@ final class Database {
         try deleteListItem(table: "projects", id: id)
     }
 
+    func setArchived(id: Int64, archived: Bool) throws {
+        try setListArchived(table: "clients", id: id, archived: archived)
+    }
+
+    func setProjectArchived(id: Int64, archived: Bool) throws {
+        try setListArchived(table: "projects", id: id, archived: archived)
+    }
+
+    private func setListArchived(table: String, id: Int64, archived: Bool) throws {
+        let sql = "UPDATE \(table) SET archived = ? WHERE id = ?;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.exec(lastError())
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int(stmt, 1, archived ? 1 : 0)
+        sqlite3_bind_int64(stmt, 2, id)
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            throw DatabaseError.exec(lastError())
+        }
+    }
+
     private func listItems(_ table: String) -> [NamedListItem] {
         var stmt: OpaquePointer?
-        let sql = "SELECT id, name, sort_order FROM \(table) ORDER BY sort_order, name;"
+        let hasArchived = tableHasColumn(table, "archived")
+        let sql = hasArchived
+            ? "SELECT id, name, sort_order, archived FROM \(table) ORDER BY sort_order, name;"
+            : "SELECT id, name, sort_order FROM \(table) ORDER BY sort_order, name;"
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
         defer { sqlite3_finalize(stmt) }
         var items: [NamedListItem] = []
@@ -269,7 +285,8 @@ final class Database {
             let id = sqlite3_column_int64(stmt, 0)
             let name = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
             let order = Int(sqlite3_column_int(stmt, 2))
-            items.append(NamedListItem(id: id, name: name, sortOrder: order))
+            let archived = hasArchived && sqlite3_column_int(stmt, 3) != 0
+            items.append(NamedListItem(id: id, name: name, sortOrder: order, archived: archived))
         }
         return items
     }

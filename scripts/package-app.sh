@@ -34,6 +34,8 @@ swiftc \
   Time/HistoryView.swift \
   Time/ReportView.swift \
   Time/WorkTypeEditor.swift \
+  Time/ClientEditor.swift \
+  Time/ProjectEditor.swift \
   Time/ColorsView.swift
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
