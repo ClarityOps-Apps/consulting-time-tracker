@@ -61,12 +61,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        showTimeWindow()
+        revealTime()
         return true
     }
 
     @objc func handleReopenEvent(_ event: NSAppleEventDescriptor, replyEvent: NSAppleEventDescriptor) {
-        showTimeWindow()
+        revealTime()
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        let anyVisible = [timeWindow, historyWindow, reportWindow].compactMap { $0 }.contains { $0.isVisible }
+        if !anyVisible { revealTime() }
+    }
+
+    private func revealTime() {
+        NSApp.setActivationPolicy(.regular)
+        DispatchQueue.main.async { [weak self] in
+            self?.showTimeWindow()
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
