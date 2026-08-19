@@ -113,16 +113,30 @@ struct TimeWindowView: View {
                 store.openWorkTypes()
             }
         } label: {
-            HStack {
+            HStack(spacing: 0) {
                 Text(store.workType.isEmpty ? "Choose…" : store.workType)
+                    .font(.system(size: 13))
                     .foregroundStyle(store.workType.isEmpty ? palette.quiet : palette.font)
                     .lineLimit(1)
-                Spacer(minLength: 4)
-                Text("▾")
-                    .font(.system(size: 9))
-                    .foregroundStyle(palette.quiet)
+                    .padding(.leading, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(palette.quiet)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(Color.white)
+                }
+                .frame(width: 16, height: 16)
+                .padding(.trailing, 4)
             }
-            .modifier(QuietField(palette: palette))
+            .frame(width: 148, height: 24)
+            .background(palette.wash)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(palette.line, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
