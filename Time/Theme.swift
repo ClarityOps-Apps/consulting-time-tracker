@@ -105,6 +105,7 @@ struct ActionButtonStyle: ButtonStyle {
             .font(.system(size: 18, weight: .bold))
             .foregroundStyle(Color.white)
             .frame(maxWidth: .infinity, minHeight: 48, maxHeight: 48)
+            .contentShape(Rectangle())
             .background(color.opacity(configuration.isPressed ? 0.88 : 1))
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
@@ -119,6 +120,7 @@ struct SmallActionButtonStyle: ButtonStyle {
             .foregroundStyle(Color.white)
             .padding(.horizontal, 10)
             .frame(height: 26)
+            .contentShape(Rectangle())
             .background(color.opacity(configuration.isPressed ? 0.88 : 1))
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
     }

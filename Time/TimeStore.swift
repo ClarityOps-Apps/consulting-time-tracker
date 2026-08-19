@@ -49,9 +49,7 @@ final class TimeStore: ObservableObject {
     func startTicking() {
         tickTimer?.invalidate()
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.now = Date()
-            }
+            self?.now = Date()
         }
         RunLoop.main.add(timer, forMode: .common)
         tickTimer = timer
@@ -91,10 +89,12 @@ final class TimeStore: ObservableObject {
     }
 
     func start() {
-        guard !isRunning else { return }
+        if isRunning { return }
         runningStartedAt = Date()
+        now = Date()
         isRunning = true
         persistFormAndRunning()
+        objectWillChange.send()
     }
 
     func stop() {
