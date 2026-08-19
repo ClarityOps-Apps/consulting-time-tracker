@@ -208,7 +208,10 @@ final class TimeStore: ObservableObject {
         let key = currentIdentityKey
         let clockKey = ParkedSession.identityKey(client: clockClient, project: clockProject, workType: clockWorkType)
         guard key != clockKey else { return }
-        start()
+        parkCurrent()
+        clockClient = client
+        clockProject = project
+        clockWorkType = workType
     }
 
     func start() {
