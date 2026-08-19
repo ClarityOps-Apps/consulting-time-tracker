@@ -7,9 +7,18 @@ struct TimeWindowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Time")
+            HStack {
+                Text("Time")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(palette.quiet)
+                Spacer()
+                Button("Colors") {
+                    store.openColors()
+                }
+                .buttonStyle(.plain)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(palette.quiet)
+            }
 
             clockLabel
                 .frame(maxWidth: .infinity, minHeight: 42)
@@ -108,9 +117,9 @@ struct TimeWindowView: View {
                 LinearGradient(
                     stops: [
                         .init(color: Color.white, location: 0),
-                        .init(color: Color(rgbHex: "F8B08A"), location: 0.18),
-                        .init(color: Color(rgbHex: "F65D36"), location: 0.36),
-                        .init(color: palette.font, location: 0.62),
+                        .init(color: palette.minutes, location: 0.22),
+                        .init(color: palette.minutes, location: 0.40),
+                        .init(color: palette.font, location: 0.68),
                         .init(color: palette.font, location: 1)
                     ],
                     startPoint: .topLeading,

@@ -6,16 +6,19 @@ struct Palette: Equatable {
     static let defaultAction = "F65D36"
     static let defaultQuiet = "447384"
     static let defaultWindow = "FEFEFE"
+    static let defaultMinutes = "F65D36"
 
     var fontHex = defaultFont
     var actionHex = defaultAction
     var quietHex = defaultQuiet
     var windowHex = defaultWindow
+    var minutesHex = defaultMinutes
 
     var font: Color { Color(rgbHex: fontHex) }
     var action: Color { Color(rgbHex: actionHex) }
     var quiet: Color { Color(rgbHex: quietHex) }
     var window: Color { Color(rgbHex: windowHex) }
+    var minutes: Color { Color(rgbHex: minutesHex) }
     var wash: Color { Color(red: 247 / 255, green: 247 / 255, blue: 247 / 255) }
     var line: Color { font.opacity(0.12) }
     var actionWash: Color { action.opacity(0.10) }

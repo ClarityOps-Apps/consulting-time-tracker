@@ -33,7 +33,8 @@ swiftc \
   Time/TimeWindowView.swift \
   Time/HistoryView.swift \
   Time/ReportView.swift \
-  Time/WorkTypeEditor.swift
+  Time/WorkTypeEditor.swift \
+  Time/ColorsView.swift
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>

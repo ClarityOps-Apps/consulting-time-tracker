@@ -17,6 +17,7 @@ final class TimeStore: ObservableObject {
     @Published var customStart = Date()
     @Published var customEnd = Date()
     var onOpenWorkTypes: (() -> Void)?
+    var onOpenColors: (() -> Void)?
 
     private let db: Database
     private var tickTimer: Timer?
@@ -169,6 +170,7 @@ final class TimeStore: ObservableObject {
     private func reload() {
         reloadWorkTypes()
         reloadEntries()
+        loadPalette()
         workType = db.setting("work_type") ?? ""
         client = db.setting("client") ?? ""
         project = db.setting("project") ?? ""
@@ -222,6 +224,32 @@ final class TimeStore: ObservableObject {
 
     func openWorkTypes() {
         onOpenWorkTypes?()
+    }
+
+    func openColors() {
+        onOpenColors?()
+    }
+
+    func persistPalette() {
+        do {
+            try db.setSetting("color_font", palette.fontHex)
+            try db.setSetting("color_action", palette.actionHex)
+            try db.setSetting("color_quiet", palette.quietHex)
+            try db.setSetting("color_window", palette.windowHex)
+            try db.setSetting("color_minutes", palette.minutesHex)
+        } catch {
+            NSLog("Time: could not save colors: \(error)")
+        }
+    }
+
+    private func loadPalette() {
+        var next = Palette()
+        if let value = db.setting("color_font"), !value.isEmpty { next.fontHex = value }
+        if let value = db.setting("color_action"), !value.isEmpty { next.actionHex = value }
+        if let value = db.setting("color_quiet"), !value.isEmpty { next.quietHex = value }
+        if let value = db.setting("color_window"), !value.isEmpty { next.windowHex = value }
+        if let value = db.setting("color_minutes"), !value.isEmpty { next.minutesHex = value }
+        palette = next
     }
 
     func filteredEntries() -> [TimeEntry] {
