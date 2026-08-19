@@ -2,7 +2,6 @@ import SwiftUI
 
 struct TimeWindowView: View {
     @ObservedObject var store: TimeStore
-    @State private var clockPulse = false
     private var palette: Palette { store.palette }
 
     var body: some View {
@@ -23,13 +22,6 @@ struct TimeWindowView: View {
             clockLabel
                 .frame(maxWidth: .infinity, minHeight: 42)
                 .padding(.top, 14)
-                .onAppear { kickPulse(store.isRunning) }
-                .onChange(of: store.isRunning) { _, running in
-                    kickPulse(running)
-                }
-                .onChange(of: store.isPaused) { _, paused in
-                    if paused { kickPulse(false) }
-                }
 
             Text((store.isRunning || store.isPaused) ? store.runningSubtitle : " ")
                 .font(.system(size: 12))
@@ -121,24 +113,10 @@ struct TimeWindowView: View {
             .font(.system(size: 34, weight: .semibold))
             .monospacedDigit()
             .foregroundStyle((store.isRunning || store.isPaused) ? palette.font : palette.quiet)
-            .scaleEffect(store.isRunning && clockPulse ? 1.07 : 1)
-            .opacity(store.isRunning && clockPulse ? 0.58 : 1)
-            .animation(
-                store.isRunning
-                    ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true)
-                    : nil,
-                value: clockPulse
-            )
-            .id(store.isRunning)
+            .scaleEffect(store.isRunning ? 1 + 0.07 * store.breathe : 1)
+            .opacity(store.isRunning ? 1 - 0.42 * store.breathe : 1)
     }
 
-    private func kickPulse(_ running: Bool) {
-        clockPulse = false
-        guard running else { return }
-        DispatchQueue.main.async {
-            clockPulse = true
-        }
-    }
 
     private func fieldRow<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
         HStack {

@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var colorsWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
     private var revealInFlight = false
+    private var lastBreatheRunning = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSAppleEventManager.shared().setEventHandler(
@@ -67,6 +68,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             }
             .store(in: &cancellables)
         store.$now
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.refreshStatusItem()
+            }
+            .store(in: &cancellables)
+        store.$breathe
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 self?.refreshStatusItem()
@@ -155,6 +162,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             button.title = " " + DurationFormat.menuBar(store.displaySeconds)
         } else {
             button.title = ""
+        }
+        button.wantsLayer = true
+        if store.isRunning {
+            let amount = store.breathe
+            button.layer?.opacity = Float(1 - 0.42 * amount)
+            let scale = 1 + 0.07 * amount
+            button.layer?.setAffineTransform(CGAffineTransform(scaleX: scale, y: scale))
+        } else {
+            button.layer?.opacity = 1
+            button.layer?.setAffineTransform(.identity)
         }
     }
 

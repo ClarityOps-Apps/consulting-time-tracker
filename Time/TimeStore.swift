@@ -18,6 +18,7 @@ final class TimeStore: ObservableObject {
     @Published var entries: [TimeEntry] = []
     @Published var parked: [ParkedSession] = []
     @Published var now = Date()
+    @Published var breathe = 0.0
     @Published var palette = Palette()
     @Published var dateRange: DateRangeKind = .thisWeek
     @Published var customStart = Date()
@@ -36,6 +37,8 @@ final class TimeStore: ObservableObject {
 
     private let db: Database
     private var tickTimer: Timer?
+    private var breatheTimer: Timer?
+    private var breatheStartedAt: Date?
     private var clockClient = ""
     private var clockProject = ""
     private var clockWorkType = ""
@@ -52,6 +55,7 @@ final class TimeStore: ObservableObject {
         restoreHeld()
         reloadParked()
         startTicking()
+        if isRunning { startBreathe() }
         observeForm()
     }
 
@@ -74,6 +78,38 @@ final class TimeStore: ObservableObject {
         }
         RunLoop.main.add(timer, forMode: .common)
         tickTimer = timer
+    }
+
+    func startBreathe() {
+        breatheStartedAt = Date()
+        breatheTimer?.invalidate()
+        let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            self?.tickBreathe()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        breatheTimer = timer
+        tickBreathe()
+    }
+
+    func stopBreathe() {
+        breatheTimer?.invalidate()
+        breatheTimer = nil
+        breatheStartedAt = nil
+        breathe = 0
+    }
+
+    private func tickBreathe() {
+        guard isRunning, let origin = breatheStartedAt else {
+            breathe = 0
+            return
+        }
+        let elapsed = Date().timeIntervalSince(origin)
+        let half = 0.9
+        let cycle = half * 2
+        let phase = elapsed.truncatingRemainder(dividingBy: cycle)
+        let linear = phase <= half ? phase / half : (cycle - phase) / half
+        let eased = linear < 0.5 ? 2 * linear * linear : 1 - pow(-2 * linear + 2, 2) / 2
+        breathe = eased
     }
 
     var displaySeconds: Int {
@@ -177,6 +213,7 @@ final class TimeStore: ObservableObject {
             runningStartedAt = now
             isRunning = true
             isPaused = false
+            startBreathe()
             persistFormAndRunning()
             persistHeld()
             objectWillChange.send()
@@ -203,6 +240,7 @@ final class TimeStore: ObservableObject {
         runningStartedAt = now
         isRunning = true
         isPaused = false
+        startBreathe()
         persistFormAndRunning()
         persistHeld()
         objectWillChange.send()
@@ -214,6 +252,7 @@ final class TimeStore: ObservableObject {
         isRunning = false
         isPaused = true
         runningStartedAt = nil
+        stopBreathe()
         persistHeld()
         persistForm()
         do { try db.clearRunningSession() } catch {
@@ -251,6 +290,7 @@ final class TimeStore: ObservableObject {
         runningStartedAt = nil
         sessionStartedAt = nil
         heldSeconds = 0
+        stopBreathe()
         persistHeld()
         reloadEntries()
         persistForm()
@@ -312,6 +352,7 @@ final class TimeStore: ObservableObject {
         runningStartedAt = nil
         sessionStartedAt = nil
         heldSeconds = 0
+        stopBreathe()
         persistHeld()
         do { try db.clearRunningSession() } catch {
             NSLog("Time: could not clear running session: \(error)")
