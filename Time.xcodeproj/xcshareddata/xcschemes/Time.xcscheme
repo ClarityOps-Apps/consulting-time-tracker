@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "A50000000000000000000001"
+               BlueprintIdentifier = "A50000000000000100000001"
                BuildableName = "Time.app"
                BlueprintName = "Time"
                ReferencedContainer = "container:Time.xcodeproj">
@@ -26,8 +26,7 @@
       buildConfiguration = "Debug"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
-      shouldUseLaunchSchemeArgsEnv = "YES"
-      shouldAutocreateTestPlan = "YES">
+      shouldUseLaunchSchemeArgsEnv = "YES">
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
@@ -43,7 +42,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A50000000000000000000001"
+            BlueprintIdentifier = "A50000000000000100000001"
             BuildableName = "Time.app"
             BlueprintName = "Time"
             ReferencedContainer = "container:Time.xcodeproj">
@@ -60,7 +59,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A50000000000000000000001"
+            BlueprintIdentifier = "A50000000000000100000001"
             BuildableName = "Time.app"
             BlueprintName = "Time"
             ReferencedContainer = "container:Time.xcodeproj">

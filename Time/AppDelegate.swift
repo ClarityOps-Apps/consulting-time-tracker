@@ -8,10 +8,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var timeWindow: NSWindow?
     private var historyWindow: NSWindow?
     private var reportWindow: NSWindow?
+    private var colorsWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        store.onOpenColors = { [weak self] in
+            self?.showColors()
+        }
         buildStatusItem()
         showTimeWindow()
         store.objectWillChange
@@ -19,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .sink { [weak self] _ in
                 DispatchQueue.main.async {
                     self?.refreshStatusItem()
+                    self?.refreshWindowColors()
                 }
             }
             .store(in: &cancellables)
@@ -36,9 +41,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return true
     }
 
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
     private func buildStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Time")
+        item.button?.image = statusClockImage()
         item.button?.image?.isTemplate = true
         item.button?.imagePosition = .imageLeft
         let menu = NSMenu()
@@ -67,12 +76,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func refreshStatusItem() {
         guard let button = statusItem?.button else { return }
         if button.image == nil {
-            button.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Time")
+            button.image = statusClockImage()
             button.image?.isTemplate = true
             button.imagePosition = .imageLeft
         }
-        let seconds = store.isRunning ? store.displaySeconds : 0
-        button.title = " " + DurationFormat.menuBar(seconds)
+        if store.isRunning {
+            button.title = " " + DurationFormat.menuBar(store.displaySeconds)
+        } else {
+            button.title = ""
+        }
+    }
+
+    private func refreshWindowColors() {
+        let color = store.palette.nsWindow
+        timeWindow?.backgroundColor = color
+        historyWindow?.backgroundColor = color
+        reportWindow?.backgroundColor = color
+        colorsWindow?.backgroundColor = color
     }
 
     @objc func toggleTimer() {
@@ -113,6 +133,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         present(reportWindow)
     }
 
+    @objc func showColors() {
+        if colorsWindow == nil {
+            colorsWindow = makeWindow(
+                title: "Colors",
+                size: NSSize(width: 280, height: 320),
+                root: ColorsView(store: store)
+            )
+        }
+        present(colorsWindow)
+    }
+
     @objc func quit() {
         NSApp.terminate(nil)
     }
@@ -129,7 +160,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         window.title = title
         window.styleMask = [.titled, .closable, .miniaturizable]
         window.setContentSize(size)
-        window.backgroundColor = Theme.nsWindow
+        window.backgroundColor = store.palette.nsWindow
+        window.appearance = NSAppearance(named: .aqua)
         window.isReleasedWhenClosed = false
         window.center()
         return window

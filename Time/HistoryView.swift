@@ -1,51 +1,111 @@
 import SwiftUI
 
 struct DateRangeBar: View {
-    @Binding var range: DateRangeKind
-    @Binding var customStart: Date
-    @Binding var customEnd: Date
-    var trailing: AnyView? = nil
+    @ObservedObject var store: TimeStore
+    var showSave = false
+    var onSave: (() -> Void)? = nil
+    @State private var menuOpen = false
+
+    private var palette: Palette { store.palette }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Picker("", selection: $range) {
-                    ForEach(DateRangeKind.allCases) { item in
-                        Text(item.rawValue).tag(item)
-                    }
-                }
-                .labelsHidden()
-                .frame(maxWidth: 180, alignment: .leading)
-
+            HStack(alignment: .center) {
+                rangeButton
                 Spacer()
-                if let trailing {
-                    trailing
+                if showSave {
+                    Button("Save CSV") { onSave?() }
+                        .buttonStyle(SmallActionButtonStyle(color: palette.action))
                 }
             }
-            if range == .chooseDates {
+            if store.dateRange == .chooseDates {
                 HStack {
-                    DatePicker("", selection: $customStart, displayedComponents: .date)
+                    DatePicker("", selection: $store.customStart, displayedComponents: .date)
                         .labelsHidden()
                         .datePickerStyle(.compact)
-                    DatePicker("", selection: $customEnd, displayedComponents: .date)
+                    DatePicker("", selection: $store.customEnd, displayedComponents: .date)
                         .labelsHidden()
                         .datePickerStyle(.compact)
                     Spacer()
                 }
             }
         }
+        .zIndex(8)
+    }
+
+    private var rangeButton: some View {
+        Button {
+            menuOpen.toggle()
+        } label: {
+            HStack(spacing: 8) {
+                Text(store.dateRange.rawValue)
+                    .foregroundStyle(palette.font)
+                Text("▾")
+                    .font(.system(size: 9))
+                    .foregroundStyle(palette.quiet)
+            }
+            .font(.system(size: 13))
+            .padding(.horizontal, 8)
+            .frame(height: 26)
+            .background(palette.wash)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(palette.line, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .topLeading) {
+            if menuOpen {
+                rangeMenu
+                    .offset(y: 30)
+            }
+        }
+    }
+
+    private var rangeMenu: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(DateRangeKind.allCases) { item in
+                if item == .chooseDates {
+                    palette.line
+                        .frame(height: 1)
+                        .padding(.vertical, 4)
+                }
+                Button {
+                    store.dateRange = item
+                    menuOpen = false
+                } label: {
+                    Text(item.rawValue)
+                        .font(.system(size: 13, weight: store.dateRange == item ? .bold : .regular))
+                        .foregroundStyle(store.dateRange == item ? palette.action : palette.font)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(store.dateRange == item ? palette.actionWash : Color.clear)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(width: 160)
+        .padding(.vertical, 4)
+        .background(palette.window)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(palette.line, lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.12), radius: 12, y: 6)
     }
 }
 
 struct HistoryView: View {
     @ObservedObject var store: TimeStore
-    @State private var range: DateRangeKind = .thisWeek
-    @State private var customStart = Date()
-    @State private var customEnd = Date()
     @State private var byClientOpen = true
 
+    private var palette: Palette { store.palette }
+
     private var filtered: [TimeEntry] {
-        store.entries(in: range, customStart: customStart, customEnd: customEnd)
+        store.filteredEntries()
     }
 
     private var totalSeconds: Int {
@@ -60,9 +120,9 @@ struct HistoryView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text("History")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Theme.quiet)
+                .foregroundStyle(palette.quiet)
 
-            DateRangeBar(range: $range, customStart: $customStart, customEnd: $customEnd)
+            DateRangeBar(store: store)
                 .padding(.top, 10)
                 .padding(.bottom, 8)
 
@@ -78,36 +138,37 @@ struct HistoryView: View {
                                     .monospacedDigit()
                             }
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Theme.font)
+                            .foregroundStyle(palette.font)
 
                             Text(entry.metaLine)
                                 .font(.system(size: 12))
-                                .foregroundStyle(Theme.quiet)
+                                .foregroundStyle(palette.quiet)
                         }
                         .padding(.vertical, 10)
                         .overlay(alignment: .top) {
-                            Theme.line.frame(height: 1)
+                            palette.line.frame(height: 1)
                         }
                     }
                 }
             }
 
             HStack {
-                Text(range.rawValue)
+                Text(store.dateRange.rawValue)
                 Spacer()
                 Text(DurationFormat.clock(totalSeconds))
                     .monospacedDigit()
             }
             .font(.system(size: 11))
-            .foregroundStyle(Theme.quiet)
+            .foregroundStyle(palette.quiet)
             .padding(.top, 8)
             .overlay(alignment: .top) {
-                Theme.line.frame(height: 1)
+                palette.line.frame(height: 1)
             }
         }
         .padding(16)
         .frame(minWidth: 380, idealWidth: 400, maxWidth: 400, minHeight: 420)
-        .background(Theme.window)
+        .background(palette.window)
+        .tint(palette.action)
     }
 
     private var byClientBlock: some View {
@@ -119,9 +180,9 @@ struct HistoryView: View {
             } label: {
                 HStack {
                     HStack(spacing: 6) {
-                        Image(systemName: byClientOpen ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(Theme.quiet)
+                        Text(byClientOpen ? "▾" : "▸")
+                            .font(.system(size: 9))
+                            .foregroundStyle(palette.quiet)
                             .frame(width: 12)
                         Text("By client")
                     }
@@ -130,7 +191,7 @@ struct HistoryView: View {
                         .monospacedDigit()
                 }
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Theme.font)
+                .foregroundStyle(palette.font)
                 .frame(minHeight: 26)
             }
             .buttonStyle(.plain)
@@ -145,7 +206,7 @@ struct HistoryView: View {
                             .monospacedDigit()
                     }
                     .font(.system(size: 13))
-                    .foregroundStyle(Theme.font)
+                    .foregroundStyle(palette.font)
                     .padding(.leading, 18)
                     .frame(minHeight: 24)
                 }
@@ -154,7 +215,7 @@ struct HistoryView: View {
         .padding(.top, 4)
         .padding(.bottom, 6)
         .overlay(alignment: .top) {
-            Theme.line.frame(height: 1)
+            palette.line.frame(height: 1)
         }
     }
 }

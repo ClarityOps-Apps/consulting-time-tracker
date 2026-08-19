@@ -4,53 +4,61 @@ struct TimeWindowView: View {
     @ObservedObject var store: TimeStore
     @State private var showEditor = false
 
+    private var palette: Palette { store.palette }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Time")
+            HStack {
+                Text("Time")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(palette.quiet)
+                Spacer()
+                Button("Colors") {
+                    store.openColors()
+                }
+                .buttonStyle(.plain)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Theme.quiet)
+                .foregroundStyle(palette.quiet)
+            }
 
             Text(DurationFormat.clock(store.displaySeconds))
                 .font(.system(size: 34, weight: .semibold))
                 .monospacedDigit()
-                .foregroundStyle(store.isRunning ? Theme.font : Theme.quiet)
+                .foregroundStyle(store.isRunning ? palette.font : palette.quiet)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 14)
 
             Text(store.isRunning ? store.runningSubtitle : " ")
                 .font(.system(size: 12))
-                .foregroundStyle(Theme.quiet)
+                .foregroundStyle(palette.quiet)
                 .frame(maxWidth: .infinity)
                 .padding(.bottom, 14)
 
             Button(store.isRunning ? "Stop" : "Start") {
                 store.toggle()
             }
-            .buttonStyle(ActionButtonStyle())
+            .buttonStyle(ActionButtonStyle(color: palette.action))
             .padding(.bottom, 14)
 
             VStack(spacing: 0) {
                 fieldRow("Work type") { workTypeControl }
                 fieldRow("Client") {
-                    TextField("Choose…", text: $store.client)
+                    TextField("", text: $store.client)
                         .textFieldStyle(.plain)
-                        .modifier(QuietField())
+                        .modifier(QuietField(palette: palette))
                 }
                 fieldRow("Project") {
-                    TextField("Choose…", text: $store.project)
+                    TextField("", text: $store.project)
                         .textFieldStyle(.plain)
-                        .modifier(QuietField())
+                        .modifier(QuietField(palette: palette))
                 }
                 fieldRow("Billable") {
-                    Toggle("", isOn: $store.billable)
-                        .labelsHidden()
-                        .toggleStyle(.checkbox)
-                        .tint(Theme.action)
+                    LookCheckbox(isOn: $store.billable, palette: palette)
                 }
             }
             .padding(.top, 8)
             .overlay(alignment: .top) {
-                Theme.line.frame(height: 1)
+                palette.line.frame(height: 1)
             }
 
             HStack(spacing: 8) {
@@ -60,15 +68,16 @@ struct TimeWindowView: View {
                 Spacer()
             }
             .font(.system(size: 11))
-            .foregroundStyle(Theme.quiet)
+            .foregroundStyle(palette.quiet)
             .padding(.top, 10)
             .overlay(alignment: .top) {
-                Theme.line.frame(height: 1)
+                palette.line.frame(height: 1)
             }
         }
         .padding(16)
         .frame(width: 280)
-        .background(Theme.window)
+        .background(palette.window)
+        .tint(palette.action)
         .sheet(isPresented: $showEditor) {
             WorkTypeEditor(store: store)
         }
@@ -78,7 +87,7 @@ struct TimeWindowView: View {
         HStack {
             Text(label)
                 .font(.system(size: 13))
-                .foregroundStyle(Theme.font)
+                .foregroundStyle(palette.font)
             Spacer(minLength: 12)
             content()
         }
@@ -99,14 +108,14 @@ struct TimeWindowView: View {
         } label: {
             HStack {
                 Text(store.workType.isEmpty ? "Choose…" : store.workType)
-                    .foregroundStyle(store.workType.isEmpty ? Theme.quiet : Theme.font)
+                    .foregroundStyle(store.workType.isEmpty ? palette.quiet : palette.font)
                     .lineLimit(1)
                 Spacer(minLength: 4)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(Theme.quiet)
+                Text("▾")
+                    .font(.system(size: 9))
+                    .foregroundStyle(palette.quiet)
             }
-            .modifier(QuietField())
+            .modifier(QuietField(palette: palette))
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)

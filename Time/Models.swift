@@ -30,7 +30,7 @@ enum DateRangeKind: String, CaseIterable, Identifiable {
     case thisWeek = "This week"
     case lastWeek = "Last week"
     case thisMonth = "This month"
-    case chooseDates = "Choose dates"
+    case chooseDates = "Choose dates…"
 
     var id: String { rawValue }
 

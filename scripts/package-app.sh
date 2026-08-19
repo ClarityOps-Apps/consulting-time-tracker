@@ -33,8 +33,44 @@ swiftc \
   Time/TimeWindowView.swift \
   Time/HistoryView.swift \
   Time/ReportView.swift \
-  Time/WorkTypeEditor.swift
+  Time/WorkTypeEditor.swift \
+  Time/ColorsView.swift
 
-sed 's/\$(PRODUCT_BUNDLE_IDENTIFIER)/co.clarityops.Time/' "$ROOT/Time/Info.plist" > "$APP/Contents/Info.plist"
+cat > "$APP/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Time</string>
+	<key>CFBundleExecutable</key>
+	<string>Time</string>
+	<key>CFBundleIdentifier</key>
+	<string>co.clarityops.Time</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Time</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+</dict>
+</plist>
+PLIST
 
+echo -n 'APPL????' > "$APP/Contents/PkgInfo"
+codesign --force --sign - "$APP" >/dev/null 2>&1 || true
 echo "Built $APP"

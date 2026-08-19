@@ -6,53 +6,57 @@ struct WorkTypeEditor: View {
     @State private var draft: [Int64: String] = [:]
     @State private var newName = ""
 
+    private var palette: Palette { store.palette }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Work type")
+            Text("Edit list…")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Theme.quiet)
-
-            Text("Starter names. Add, rename, or remove. This list is yours.")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.quiet)
+                .foregroundStyle(palette.quiet)
 
             List {
                 ForEach(store.workTypes) { item in
                     HStack {
-                        TextField("Name", text: binding(for: item))
-                            .textFieldStyle(.roundedBorder)
+                        TextField("", text: binding(for: item))
+                            .textFieldStyle(.plain)
                             .onSubmit { commit(item) }
                         Button {
                             store.removeWorkType(item)
                             draft[item.id] = nil
                         } label: {
                             Image(systemName: "minus.circle")
+                                .foregroundStyle(palette.quiet)
                         }
                         .buttonStyle(.borderless)
                     }
                 }
             }
             .listStyle(.inset)
+            .scrollContentBackground(.hidden)
 
             HStack {
-                TextField("Add", text: $newName)
-                    .textFieldStyle(.roundedBorder)
+                TextField("", text: $newName)
+                    .textFieldStyle(.plain)
+                    .padding(.horizontal, 8)
+                    .frame(height: 24)
+                    .background(palette.wash)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(palette.line, lineWidth: 1)
+                    )
                     .onSubmit { add() }
-                Button("Add") { add() }
-            }
-
-            HStack {
-                Spacer()
-                Button("Done") {
-                    commitAll()
-                    dismiss()
+                Button {
+                    add()
+                } label: {
+                    Image(systemName: "plus.circle")
+                        .foregroundStyle(palette.action)
                 }
-                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderless)
             }
         }
         .padding(16)
         .frame(width: 300, height: 380)
-        .background(Theme.window)
+        .background(palette.window)
         .onAppear {
             draft = Dictionary(uniqueKeysWithValues: store.workTypes.map { ($0.id, $0.name) })
         }
@@ -60,6 +64,9 @@ struct WorkTypeEditor: View {
             for item in items where draft[item.id] == nil {
                 draft[item.id] = item.name
             }
+        }
+        .onDisappear {
+            commitAll()
         }
     }
 

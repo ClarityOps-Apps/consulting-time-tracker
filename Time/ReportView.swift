@@ -4,14 +4,13 @@ import UniformTypeIdentifiers
 
 struct ReportView: View {
     @ObservedObject var store: TimeStore
-    @State private var range: DateRangeKind = .thisWeek
-    @State private var customStart = Date()
-    @State private var customEnd = Date()
     @State private var openClients: Set<String> = []
     @State private var openProjects: Set<String> = []
 
+    private var palette: Palette { store.palette }
+
     private var filtered: [TimeEntry] {
-        store.entries(in: range, customStart: customStart, customEnd: customEnd)
+        store.filteredEntries()
     }
 
     private var totalSeconds: Int {
@@ -26,28 +25,20 @@ struct ReportView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Report")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Theme.quiet)
+                .foregroundStyle(palette.quiet)
 
-            DateRangeBar(
-                range: $range,
-                customStart: $customStart,
-                customEnd: $customEnd,
-                trailing: AnyView(
-                    Button("Save CSV") { saveCSV() }
-                        .buttonStyle(SmallActionButtonStyle())
-                )
-            )
-            .padding(.top, 10)
-            .padding(.bottom, 8)
+            DateRangeBar(store: store, showSave: true, onSave: saveCSV)
+                .padding(.top, 10)
+                .padding(.bottom, 8)
 
             VStack(spacing: 2) {
                 Text(DurationFormat.clock(totalSeconds))
                     .font(.system(size: 34, weight: .semibold))
                     .monospacedDigit()
-                    .foregroundStyle(Theme.font)
+                    .foregroundStyle(palette.font)
                 Text("Hours and minutes")
                     .font(.system(size: 12))
-                    .foregroundStyle(Theme.quiet)
+                    .foregroundStyle(palette.quiet)
             }
             .frame(maxWidth: .infinity)
             .padding(.bottom, 14)
@@ -60,17 +51,20 @@ struct ReportView: View {
                 }
                 .padding(.top, 6)
                 .overlay(alignment: .top) {
-                    Theme.line.frame(height: 1)
+                    palette.line.frame(height: 1)
                 }
             }
         }
         .padding(16)
         .frame(minWidth: 380, idealWidth: 400, maxWidth: 400, minHeight: 420)
-        .background(Theme.window)
+        .background(palette.window)
+        .tint(palette.action)
         .onAppear {
-            openClients = Set(tree.map(\.id))
-            if let first = tree.first, let firstProject = first.projects.first {
-                openProjects.insert(projectKey(client: first.id, project: firstProject.id))
+            if openClients.isEmpty {
+                openClients = Set(tree.prefix(1).map(\.id))
+                if let first = tree.first, let firstProject = first.projects.first {
+                    openProjects.insert(projectKey(client: first.id, project: firstProject.id))
+                }
             }
         }
     }
@@ -91,7 +85,7 @@ struct ReportView: View {
                         .monospacedDigit()
                 }
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Theme.font)
+                .foregroundStyle(palette.font)
                 .padding(.top, 8)
                 .frame(minHeight: 26)
             }
@@ -123,7 +117,7 @@ struct ReportView: View {
                         .monospacedDigit()
                 }
                 .font(.system(size: 13))
-                .foregroundStyle(Theme.font)
+                .foregroundStyle(palette.font)
                 .padding(.leading, 18)
                 .frame(minHeight: 26)
             }
@@ -138,7 +132,7 @@ struct ReportView: View {
                             .monospacedDigit()
                     }
                     .font(.system(size: 12))
-                    .foregroundStyle(Theme.quiet)
+                    .foregroundStyle(palette.quiet)
                     .padding(.leading, 48)
                     .frame(minHeight: 24)
                 }
@@ -147,9 +141,9 @@ struct ReportView: View {
     }
 
     private func caret(_ open: Bool) -> some View {
-        Image(systemName: open ? "chevron.down" : "chevron.right")
-            .font(.system(size: 9, weight: .semibold))
-            .foregroundStyle(Theme.quiet)
+        Text(open ? "▾" : "▸")
+            .font(.system(size: 9))
+            .foregroundStyle(palette.quiet)
             .frame(width: 12)
     }
 
