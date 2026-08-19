@@ -28,17 +28,14 @@ struct TimeWindowView: View {
                     kickPulse(running)
                 }
 
-            Text(store.isRunning ? store.runningSubtitle : " ")
+            Text((store.isRunning || store.isPaused) ? store.runningSubtitle : " ")
                 .font(.system(size: 12))
                 .foregroundStyle(palette.quiet)
                 .frame(maxWidth: .infinity)
                 .padding(.bottom, 14)
 
-            Button(store.isRunning ? "Stop" : "Start") {
-                store.toggle()
-            }
-            .buttonStyle(ActionButtonStyle(color: palette.action))
-            .padding(.bottom, 14)
+            timerButtons
+                .padding(.bottom, 14)
 
             VStack(spacing: 0) {
                 fieldRow("Work type") { workTypeControl }
@@ -78,6 +75,26 @@ struct TimeWindowView: View {
         .frame(width: 280)
         .background(palette.window)
         .tint(palette.action)
+    }
+
+    @ViewBuilder
+    private var timerButtons: some View {
+        if store.isRunning || store.isPaused {
+            HStack(spacing: 8) {
+                if store.isPaused {
+                    Button("Start") { store.start() }
+                        .buttonStyle(ActionButtonStyle(color: palette.action))
+                } else {
+                    Button("Pause") { store.pause() }
+                        .buttonStyle(ActionButtonStyle(color: palette.action))
+                }
+                Button("Stop") { store.stop() }
+                    .buttonStyle(ActionButtonStyle(color: palette.action))
+            }
+        } else {
+            Button("Start") { store.start() }
+                .buttonStyle(ActionButtonStyle(color: palette.action))
+        }
     }
 
     private var clockLabel: some View {
@@ -150,38 +167,20 @@ struct TimeWindowView: View {
     }
 
     private var workTypeControl: some View {
-        TextField("", text: Binding(
-            get: { store.workType.isEmpty ? "Choose…" : store.workType },
-            set: { _ in }
-        ))
-        .textFieldStyle(.plain)
-        .modifier(QuietField(palette: palette))
-        .overlay(alignment: .trailing) {
-            Image(systemName: "arrowtriangle.down.fill")
-                .font(.system(size: 6, weight: .bold))
-                .foregroundStyle(palette.font)
-                .padding(.trailing, 8)
-                .allowsHitTesting(false)
-        }
-        .overlay {
-            Menu {
-                ForEach(store.workTypes) { item in
-                    Button(item.name) {
-                        store.workType = item.name
-                    }
-                }
-                Divider()
-                Button("Edit list…") {
-                    store.openWorkTypes()
-                }
-            } label: {
-                Color.clear
-                    .frame(width: 148, height: 24)
-                    .contentShape(Rectangle())
+        Button {
+            store.openWorkTypeMenu()
+        } label: {
+            HStack {
+                Text(store.workType.isEmpty ? "Choose…" : store.workType)
+                    .foregroundStyle(store.workType.isEmpty ? palette.quiet : palette.font)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Image(systemName: "arrowtriangle.down.fill")
+                    .font(.system(size: 6, weight: .bold))
+                    .foregroundStyle(palette.font)
             }
-            .buttonStyle(.plain)
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
+            .modifier(QuietField(palette: palette))
         }
+        .buttonStyle(.plain)
     }
 }

@@ -20,6 +20,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         store.onOpenColors = { [weak self] in
             self?.showColors()
         }
+        store.onOpenHistory = { [weak self] in
+            self?.showHistory()
+        }
+        store.onOpenWorkTypeMenu = { [weak self] in
+            self?.popWorkTypeMenu()
+        }
         buildStatusItem()
         showTimeWindow()
         store.objectWillChange
@@ -62,7 +68,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        addItem(menu, title: store.isRunning ? "Stop" : "Start", action: #selector(toggleTimer))
+        if store.isRunning {
+            addItem(menu, title: "Pause", action: #selector(pauseTimer))
+            addItem(menu, title: "Stop", action: #selector(stopTimer))
+        } else if store.isPaused {
+            addItem(menu, title: "Start", action: #selector(startTimer))
+            addItem(menu, title: "Stop", action: #selector(stopTimer))
+        } else {
+            addItem(menu, title: "Start", action: #selector(startTimer))
+        }
         menu.addItem(.separator())
         addItem(menu, title: "Show window", action: #selector(showTimeWindow))
         addItem(menu, title: "History", action: #selector(showHistory))
@@ -84,7 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             button.image?.isTemplate = true
             button.imagePosition = .imageLeft
         }
-        if store.isRunning {
+        if store.isRunning || store.isPaused {
             button.title = " " + DurationFormat.menuBar(store.displaySeconds)
         } else {
             button.title = ""
@@ -100,8 +114,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         colorsWindow?.backgroundColor = color
     }
 
-    @objc func toggleTimer() {
-        store.toggle()
+    @objc func startTimer() {
+        store.start()
+        refreshStatusItem()
+    }
+
+    @objc func pauseTimer() {
+        store.pause()
+        refreshStatusItem()
+    }
+
+    @objc func stopTimer() {
+        store.stop()
         refreshStatusItem()
     }
 
@@ -153,6 +177,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func closeWorkTypes() {
         editorWindow?.orderOut(nil)
+    }
+
+    @objc func popWorkTypeMenu() {
+        let menu = NSMenu()
+        for item in store.workTypes {
+            let row = NSMenuItem(title: item.name, action: #selector(pickWorkType(_:)), keyEquivalent: "")
+            row.target = self
+            row.representedObject = item.name
+            if item.name == store.workType {
+                row.state = .on
+            }
+            menu.addItem(row)
+        }
+        menu.addItem(.separator())
+        let edit = NSMenuItem(title: "Edit list…", action: #selector(showWorkTypes), keyEquivalent: "")
+        edit.target = self
+        menu.addItem(edit)
+        if let event = NSApp.currentEvent, let view = timeWindow?.contentView {
+            NSMenu.popUpContextMenu(menu, with: event, for: view)
+        } else if let view = timeWindow?.contentView {
+            let point = NSPoint(x: view.bounds.maxX - 40, y: view.bounds.midY)
+            menu.popUp(positioning: nil, at: point, in: view)
+        }
+    }
+
+    @objc func pickWorkType(_ sender: NSMenuItem) {
+        guard let name = sender.representedObject as? String else { return }
+        store.workType = name
     }
 
     @objc func showColors() {

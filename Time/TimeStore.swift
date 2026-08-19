@@ -4,7 +4,10 @@ import SwiftUI
 
 final class TimeStore: ObservableObject {
     @Published var isRunning = false
+    @Published var isPaused = false
     @Published var runningStartedAt: Date?
+    @Published var sessionStartedAt: Date?
+    @Published var heldSeconds = 0
     @Published var workType = ""
     @Published var client = ""
     @Published var project = ""
@@ -18,6 +21,8 @@ final class TimeStore: ObservableObject {
     @Published var customEnd = Date()
     var onOpenWorkTypes: (() -> Void)?
     var onOpenColors: (() -> Void)?
+    var onOpenHistory: (() -> Void)?
+    var onOpenWorkTypeMenu: (() -> Void)?
 
     private let db: Database
     private var tickTimer: Timer?
@@ -31,6 +36,7 @@ final class TimeStore: ObservableObject {
         }
         reload()
         restoreSession()
+        restoreHeld()
         startTicking()
         observeForm()
     }
@@ -57,8 +63,11 @@ final class TimeStore: ObservableObject {
     }
 
     var displaySeconds: Int {
-        guard isRunning, let start = runningStartedAt else { return 0 }
-        return max(0, Int(now.timeIntervalSince(start)))
+        var live = 0
+        if isRunning, let start = runningStartedAt {
+            live = max(0, Int(now.timeIntervalSince(start)))
+        }
+        return max(0, heldSeconds + live)
     }
 
     var runningSubtitle: String {
@@ -73,7 +82,7 @@ final class TimeStore: ObservableObject {
         let finished = entries
             .filter { $0.startedAt >= start && $0.startedAt < end }
             .reduce(0) { $0 + $1.durationSeconds }
-        return finished + (isRunning ? displaySeconds : 0)
+        return finished + ((isRunning || isPaused) ? displaySeconds : 0)
     }
 
     func entries(in range: DateRangeKind, customStart: Date, customEnd: Date) -> [TimeEntry] {
@@ -91,17 +100,41 @@ final class TimeStore: ObservableObject {
 
     func start() {
         if isRunning { return }
-        runningStartedAt = Date()
         now = Date()
+        if !isPaused {
+            sessionStartedAt = now
+            heldSeconds = 0
+        }
+        runningStartedAt = now
         isRunning = true
+        isPaused = false
         persistFormAndRunning()
+        persistHeld()
+        objectWillChange.send()
+    }
+
+    func pause() {
+        guard isRunning, let start = runningStartedAt else { return }
+        heldSeconds += max(0, Int(Date().timeIntervalSince(start)))
+        isRunning = false
+        isPaused = true
+        runningStartedAt = nil
+        persistHeld()
+        persistForm()
+        do { try db.clearRunningSession() } catch {
+            NSLog("Time: could not clear running session: \(error)")
+        }
         objectWillChange.send()
     }
 
     func stop() {
-        guard isRunning, let start = runningStartedAt else { return }
+        guard isRunning || isPaused else { return }
         let end = Date()
-        let seconds = max(0, Int(end.timeIntervalSince(start)))
+        var seconds = heldSeconds
+        if isRunning, let start = runningStartedAt {
+            seconds += max(0, Int(end.timeIntervalSince(start)))
+        }
+        let start = sessionStartedAt ?? runningStartedAt ?? end
         do {
             try db.insertEntry(
                 startedAt: start,
@@ -117,7 +150,11 @@ final class TimeStore: ObservableObject {
             NSLog("Time: could not save entry: \(error)")
         }
         isRunning = false
+        isPaused = false
         runningStartedAt = nil
+        sessionStartedAt = nil
+        heldSeconds = 0
+        persistHeld()
         reloadEntries()
         persistForm()
     }
@@ -222,8 +259,40 @@ final class TimeStore: ObservableObject {
         }
     }
 
+    func persistHeld() {
+        do {
+            try db.setSetting("held_seconds", "\(heldSeconds)")
+            try db.setSetting("is_paused", isPaused ? "1" : "0")
+            if let start = sessionStartedAt {
+                try db.setSetting("session_started_at", String(start.timeIntervalSince1970))
+            } else {
+                try db.setSetting("session_started_at", "")
+            }
+        } catch {
+            NSLog("Time: could not save pause: \(error)")
+        }
+    }
+
+    private func restoreHeld() {
+        heldSeconds = Int(db.setting("held_seconds") ?? "0") ?? 0
+        if let raw = db.setting("session_started_at"), let value = Double(raw), value > 0 {
+            sessionStartedAt = Date(timeIntervalSince1970: value)
+        }
+        guard !isRunning, (db.setting("is_paused") ?? "0") == "1" else { return }
+        isPaused = true
+        runningStartedAt = nil
+    }
+
     func openWorkTypes() {
         onOpenWorkTypes?()
+    }
+
+    func openHistory() {
+        onOpenHistory?()
+    }
+
+    func openWorkTypeMenu() {
+        onOpenWorkTypeMenu?()
     }
 
     func openColors() {
