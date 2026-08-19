@@ -2,7 +2,7 @@ import SwiftUI
 
 struct TimeWindowView: View {
     @ObservedObject var store: TimeStore
-    @State private var clockDim = false
+    @State private var bandShown = false
     private var palette: Palette { store.palette }
 
     var body: some View {
@@ -11,22 +11,12 @@ struct TimeWindowView: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(palette.quiet)
 
-            Text(DurationFormat.clock(store.displaySeconds))
-                .font(.system(size: 34, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(store.isRunning ? palette.font : palette.quiet)
-                .opacity(store.isRunning && clockDim ? 0.72 : 1)
-                .animation(
-                    store.isRunning
-                        ? .easeInOut(duration: 1.5).repeatForever(autoreverses: true)
-                        : .linear(duration: 0.2),
-                    value: clockDim
-                )
+            clockFace
                 .frame(maxWidth: .infinity)
                 .padding(.top, 14)
-                .onAppear { kickClock(store.isRunning) }
+                .onAppear { setBand(store.isRunning) }
                 .onChange(of: store.isRunning) { _, running in
-                    kickClock(running)
+                    setBand(running)
                 }
 
             Text(store.isRunning ? store.runningSubtitle : " ")
@@ -81,12 +71,46 @@ struct TimeWindowView: View {
         .tint(palette.action)
     }
 
+    private var clockFace: some View {
+        ZStack {
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !bandShown && !store.isRunning)) { timeline in
+                GeometryReader { geo in
+                    let cycle = 5.0
+                    let phase = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: cycle) / cycle
+                    let x = geo.size.width * (-0.18 + 1.36 * phase)
+                    Ellipse()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    palette.action.opacity(0.42),
+                                    palette.action.opacity(0.14),
+                                    palette.action.opacity(0)
+                                ],
+                                center: .center,
+                                startRadius: 1,
+                                endRadius: 38
+                            )
+                        )
+                        .frame(width: 96, height: 46)
+                        .position(x: x, y: geo.size.height / 2)
+                        .blur(radius: 10)
+                        .scaleEffect(bandShown ? 1 : 0.55)
+                        .opacity(bandShown ? 1 : 0)
+                }
+            }
+            .allowsHitTesting(false)
 
-    private func kickClock(_ running: Bool) {
-        clockDim = false
-        guard running else { return }
-        DispatchQueue.main.async {
-            clockDim = true
+            Text(DurationFormat.clock(store.displaySeconds))
+                .font(.system(size: 34, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(store.isRunning ? palette.font : palette.quiet)
+        }
+        .frame(height: 42)
+    }
+
+    private func setBand(_ running: Bool) {
+        withAnimation(.easeOut(duration: 0.4)) {
+            bandShown = running
         }
     }
 
