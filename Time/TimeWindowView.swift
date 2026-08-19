@@ -11,18 +11,7 @@ struct TimeWindowView: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(palette.quiet)
 
-            Text(DurationFormat.clock(store.displaySeconds))
-                .font(.system(size: 34, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(store.isRunning ? palette.font : palette.quiet)
-                .scaleEffect(store.isRunning && clockPulse ? 1.07 : 1)
-                .opacity(store.isRunning && clockPulse ? 0.58 : 1)
-                .animation(
-                    store.isRunning
-                        ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true)
-                        : .easeOut(duration: 0.35),
-                    value: clockPulse
-                )
+            clockLabel
                 .frame(maxWidth: .infinity, minHeight: 42)
                 .padding(.top, 14)
                 .onAppear { kickPulse(store.isRunning) }
@@ -82,6 +71,34 @@ struct TimeWindowView: View {
         .tint(palette.action)
     }
 
+    private var clockLabel: some View {
+        let total = max(0, store.displaySeconds)
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        return HStack(alignment: .firstTextBaseline, spacing: 1) {
+            Text("\(hours)")
+                .font(.system(size: 34, weight: .bold))
+                .monospacedDigit()
+            Text("h")
+                .font(.system(size: 20, weight: .regular))
+            Text(String(format: "%02d", minutes))
+                .font(.system(size: 34, weight: .bold))
+                .monospacedDigit()
+                .padding(.leading, 5)
+            Text("m")
+                .font(.system(size: 20, weight: .regular))
+        }
+        .foregroundStyle(store.isRunning ? palette.font : palette.quiet)
+        .scaleEffect(store.isRunning && clockPulse ? 1.07 : 1)
+        .opacity(store.isRunning && clockPulse ? 0.58 : 1)
+        .animation(
+            store.isRunning
+                ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true)
+                : .easeOut(duration: 0.35),
+            value: clockPulse
+        )
+    }
+
     private func kickPulse(_ running: Bool) {
         clockPulse = false
         guard running else { return }
@@ -113,30 +130,16 @@ struct TimeWindowView: View {
                 store.openWorkTypes()
             }
         } label: {
-            HStack(spacing: 0) {
+            HStack {
                 Text(store.workType.isEmpty ? "Choose…" : store.workType)
-                    .font(.system(size: 13))
                     .foregroundStyle(store.workType.isEmpty ? palette.quiet : palette.font)
                     .lineLimit(1)
-                    .padding(.leading, 8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                ZStack {
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(palette.quiet)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 7, weight: .bold))
-                        .foregroundStyle(Color.white)
-                }
-                .frame(width: 16, height: 16)
-                .padding(.trailing, 4)
+                Spacer(minLength: 4)
+                Image(systemName: "arrowtriangle.down.fill")
+                    .font(.system(size: 6, weight: .bold))
+                    .foregroundStyle(palette.font)
             }
-            .frame(width: 148, height: 24)
-            .background(palette.wash)
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(palette.line, lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .modifier(QuietField(palette: palette))
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
