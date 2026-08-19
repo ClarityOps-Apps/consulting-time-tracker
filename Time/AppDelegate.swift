@@ -156,6 +156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         reportWindow?.backgroundColor = color
         editorWindow?.backgroundColor = color
         clientsWindow?.backgroundColor = color
+        projectsWindow?.backgroundColor = color
         colorsWindow?.backgroundColor = color
     }
 

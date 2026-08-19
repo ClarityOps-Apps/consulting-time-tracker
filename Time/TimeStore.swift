@@ -142,6 +142,7 @@ final class TimeStore: ObservableObject {
         isRunning = true
         isPaused = false
         rememberClient()
+        rememberProject()
         persistFormAndRunning()
         persistHeld()
         objectWillChange.send()
