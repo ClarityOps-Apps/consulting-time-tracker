@@ -79,16 +79,19 @@ struct TimeWindowView: View {
             Text("\(hours)")
                 .font(.system(size: 34, weight: .bold))
                 .monospacedDigit()
+                .foregroundStyle(store.isRunning ? palette.font : palette.quiet)
             Text("h")
                 .font(.system(size: 20, weight: .regular))
+                .foregroundStyle(store.isRunning ? palette.font : palette.quiet)
             Text(String(format: "%02d", minutes))
                 .font(.system(size: 34, weight: .bold))
                 .monospacedDigit()
+                .foregroundStyle(minutesStyle)
                 .padding(.leading, 5)
             Text("m")
                 .font(.system(size: 20, weight: .regular))
+                .foregroundStyle(store.isRunning ? palette.font : palette.quiet)
         }
-        .foregroundStyle(store.isRunning ? palette.font : palette.quiet)
         .scaleEffect(store.isRunning && clockPulse ? 1.07 : 1)
         .opacity(store.isRunning && clockPulse ? 0.58 : 1)
         .animation(
@@ -97,6 +100,25 @@ struct TimeWindowView: View {
                 : .easeOut(duration: 0.35),
             value: clockPulse
         )
+    }
+
+    private var minutesStyle: some ShapeStyle {
+        if store.isRunning {
+            return AnyShapeStyle(
+                LinearGradient(
+                    stops: [
+                        .init(color: Color.white, location: 0),
+                        .init(color: Color(rgbHex: "F8B08A"), location: 0.18),
+                        .init(color: Color(rgbHex: "F65D36"), location: 0.36),
+                        .init(color: palette.font, location: 0.62),
+                        .init(color: palette.font, location: 1)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+        }
+        return AnyShapeStyle(palette.quiet)
     }
 
     private func kickPulse(_ running: Bool) {
@@ -130,19 +152,19 @@ struct TimeWindowView: View {
                 store.openWorkTypes()
             }
         } label: {
-            HStack {
-                Text(store.workType.isEmpty ? "Choose…" : store.workType)
-                    .foregroundStyle(store.workType.isEmpty ? palette.quiet : palette.font)
-                    .lineLimit(1)
-                Spacer(minLength: 4)
-                Image(systemName: "arrowtriangle.down.fill")
-                    .font(.system(size: 6, weight: .bold))
-                    .foregroundStyle(palette.font)
-            }
-            .modifier(QuietField(palette: palette))
+            Text(store.workType.isEmpty ? "Choose…" : store.workType)
+                .foregroundStyle(store.workType.isEmpty ? palette.quiet : palette.font)
+                .lineLimit(1)
+                .modifier(QuietField(palette: palette))
+                .overlay(alignment: .trailing) {
+                    Image(systemName: "arrowtriangle.down.fill")
+                        .font(.system(size: 6, weight: .bold))
+                        .foregroundStyle(palette.font)
+                        .padding(.trailing, 8)
+                }
         }
+        .buttonStyle(.plain)
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
-        .frame(width: 148, height: 24)
     }
 }
