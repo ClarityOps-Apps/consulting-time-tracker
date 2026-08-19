@@ -22,6 +22,7 @@ final class TimeStore: ObservableObject {
     var onOpenWorkTypes: (() -> Void)?
     var onOpenColors: (() -> Void)?
     var onOpenHistory: (() -> Void)?
+    var onOpenReport: (() -> Void)?
     var onOpenWorkTypeMenu: (() -> Void)?
 
     private let db: Database
@@ -289,6 +290,10 @@ final class TimeStore: ObservableObject {
 
     func openHistory() {
         onOpenHistory?()
+    }
+
+    func openReport() {
+        onOpenReport?()
     }
 
     func openWorkTypeMenu() {

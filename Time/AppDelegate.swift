@@ -23,6 +23,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         store.onOpenHistory = { [weak self] in
             self?.showHistory()
         }
+        store.onOpenReport = { [weak self] in
+            self?.showReport()
+        }
         store.onOpenWorkTypeMenu = { [weak self] in
             self?.popWorkTypeMenu()
         }

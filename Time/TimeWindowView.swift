@@ -63,6 +63,10 @@ struct TimeWindowView: View {
                 Text(DurationFormat.clock(store.todaySeconds))
                     .monospacedDigit()
                 Spacer()
+                Button("History") { store.openHistory() }
+                    .buttonStyle(.plain)
+                Button("Report") { store.openReport() }
+                    .buttonStyle(.plain)
             }
             .font(.system(size: 11))
             .foregroundStyle(palette.quiet)
@@ -98,53 +102,18 @@ struct TimeWindowView: View {
     }
 
     private var clockLabel: some View {
-        let total = max(0, store.displaySeconds)
-        let hours = total / 3600
-        let minutes = (total % 3600) / 60
-        return HStack(alignment: .firstTextBaseline, spacing: 1) {
-            Text("\(hours)")
-                .font(.system(size: 34, weight: .bold))
-                .monospacedDigit()
-                .foregroundStyle(store.isRunning ? palette.font : palette.quiet)
-            Text("h")
-                .font(.system(size: 20, weight: .regular))
-                .foregroundStyle(store.isRunning ? palette.font : palette.quiet)
-            Text(String(format: "%02d", minutes))
-                .font(.system(size: 34, weight: .bold))
-                .monospacedDigit()
-                .foregroundStyle(minutesStyle)
-                .padding(.leading, 5)
-            Text("m")
-                .font(.system(size: 20, weight: .regular))
-                .foregroundStyle(store.isRunning ? palette.font : palette.quiet)
-        }
-        .scaleEffect(store.isRunning && clockPulse ? 1.07 : 1)
-        .opacity(store.isRunning && clockPulse ? 0.58 : 1)
-        .animation(
-            store.isRunning
-                ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true)
-                : .easeOut(duration: 0.35),
-            value: clockPulse
-        )
-    }
-
-    private var minutesStyle: some ShapeStyle {
-        if store.isRunning {
-            return AnyShapeStyle(
-                LinearGradient(
-                    stops: [
-                        .init(color: Color.white, location: 0),
-                        .init(color: palette.minutes, location: 0.08),
-                        .init(color: palette.minutes, location: 0.38),
-                        .init(color: palette.font, location: 0.55),
-                        .init(color: palette.font, location: 1)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
+        Text(DurationFormat.clock(store.displaySeconds))
+            .font(.system(size: 34, weight: .semibold))
+            .monospacedDigit()
+            .foregroundStyle(store.isRunning ? palette.font : palette.quiet)
+            .scaleEffect(store.isRunning && clockPulse ? 1.07 : 1)
+            .opacity(store.isRunning && clockPulse ? 0.58 : 1)
+            .animation(
+                store.isRunning
+                    ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true)
+                    : .easeOut(duration: 0.35),
+                value: clockPulse
             )
-        }
-        return AnyShapeStyle(palette.quiet)
     }
 
     private func kickPulse(_ running: Bool) {
