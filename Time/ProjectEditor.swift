@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct WorkTypeEditor: View {
+struct ProjectEditor: View {
     @ObservedObject var store: TimeStore
     var onDone: () -> Void
     @State private var draft: [Int64: String] = [:]
@@ -23,19 +23,36 @@ struct WorkTypeEditor: View {
             }
 
             List {
-                ForEach(store.workTypes) { item in
+                ForEach(store.visibleProjects) { item in
                     HStack {
                         TextField("", text: binding(for: item))
                             .textFieldStyle(.plain)
                             .onSubmit { commit(item) }
-                        Button {
-                            store.removeWorkType(item)
+                        Button("Archive") {
+                            commit(item)
+                            store.archiveProject(item)
                             draft[item.id] = nil
-                        } label: {
-                            Image(systemName: "minus.circle")
-                                .foregroundStyle(palette.quiet)
                         }
                         .buttonStyle(.borderless)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(palette.quiet)
+                    }
+                }
+
+                if !store.archivedProjects.isEmpty {
+                    ForEach(store.archivedProjects) { item in
+                        HStack {
+                            TextField("", text: binding(for: item))
+                                .textFieldStyle(.plain)
+                                .onSubmit { commit(item) }
+                            Button("Unhide") {
+                                commit(item)
+                                store.unhideProject(item)
+                            }
+                            .buttonStyle(.borderless)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(palette.quiet)
+                        }
                     }
                 }
             }
@@ -66,9 +83,9 @@ struct WorkTypeEditor: View {
         .frame(width: 300, height: 380)
         .background(palette.window)
         .onAppear {
-            draft = Dictionary(uniqueKeysWithValues: store.workTypes.map { ($0.id, $0.name) })
+            draft = Dictionary(uniqueKeysWithValues: store.projects.map { ($0.id, $0.name) })
         }
-        .onChange(of: store.workTypes) { _, items in
+        .onChange(of: store.projects) { _, items in
             for item in items where draft[item.id] == nil {
                 draft[item.id] = item.name
             }
@@ -78,7 +95,7 @@ struct WorkTypeEditor: View {
         }
     }
 
-    private func binding(for item: WorkTypeItem) -> Binding<String> {
+    private func binding(for item: ProjectItem) -> Binding<String> {
         Binding(
             get: { draft[item.id] ?? item.name },
             set: { draft[item.id] = $0 }
@@ -86,19 +103,19 @@ struct WorkTypeEditor: View {
     }
 
     private func add() {
-        store.addWorkType(newName)
+        store.addProject(newName)
         newName = ""
-        draft = Dictionary(uniqueKeysWithValues: store.workTypes.map { ($0.id, $0.name) })
+        draft = Dictionary(uniqueKeysWithValues: store.projects.map { ($0.id, $0.name) })
     }
 
-    private func commit(_ item: WorkTypeItem) {
+    private func commit(_ item: ProjectItem) {
         if let name = draft[item.id] {
-            store.renameWorkType(item, to: name)
+            store.renameProject(item, to: name)
         }
     }
 
     private func commitAll() {
-        for item in store.workTypes {
+        for item in store.projects {
             commit(item)
         }
     }

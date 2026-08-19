@@ -19,20 +19,24 @@ struct TimeEntry: Identifiable, Hashable {
     }
 }
 
-struct NamedListItem: Identifiable, Hashable {
+struct WorkTypeItem: Identifiable, Hashable {
     var id: Int64
     var name: String
     var sortOrder: Int
 }
 
-typealias WorkTypeItem = NamedListItem
-typealias ClientItem = NamedListItem
-typealias ProjectItem = NamedListItem
+struct ClientItem: Identifiable, Hashable {
+    var id: Int64
+    var name: String
+    var sortOrder: Int
+    var archived: Bool
+}
 
-enum NamedListKind {
-    case workType
-    case client
-    case project
+struct ProjectItem: Identifiable, Hashable {
+    var id: Int64
+    var name: String
+    var sortOrder: Int
+    var archived: Bool
 }
 
 enum DateRangeKind: String, CaseIterable, Identifiable {
