@@ -27,6 +27,9 @@ struct TimeWindowView: View {
                 .onChange(of: store.isRunning) { _, running in
                     kickPulse(running)
                 }
+                .onChange(of: store.isPaused) { _, paused in
+                    if paused { kickPulse(false) }
+                }
 
             Text((store.isRunning || store.isPaused) ? store.runningSubtitle : " ")
                 .font(.system(size: 12))
@@ -105,15 +108,16 @@ struct TimeWindowView: View {
         Text(DurationFormat.clock(store.displaySeconds))
             .font(.system(size: 34, weight: .semibold))
             .monospacedDigit()
-            .foregroundStyle(store.isRunning ? palette.font : palette.quiet)
+            .foregroundStyle((store.isRunning || store.isPaused) ? palette.font : palette.quiet)
             .scaleEffect(store.isRunning && clockPulse ? 1.07 : 1)
             .opacity(store.isRunning && clockPulse ? 0.58 : 1)
             .animation(
                 store.isRunning
                     ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true)
-                    : .easeOut(duration: 0.35),
+                    : nil,
                 value: clockPulse
             )
+            .id(store.isRunning)
     }
 
     private func kickPulse(_ running: Bool) {
