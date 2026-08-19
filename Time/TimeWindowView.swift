@@ -132,7 +132,7 @@ struct TimeWindowView: View {
     private var clientControl: some View {
         typedListControl(
             text: $store.client,
-            onSubmit: { store.rememberClient() },
+            onSubmit: { store.adoptFieldsIfInPlay() },
             onMenu: { store.openClientMenu() }
         )
     }
@@ -140,7 +140,7 @@ struct TimeWindowView: View {
     private var projectControl: some View {
         typedListControl(
             text: $store.project,
-            onSubmit: { store.rememberProject() },
+            onSubmit: { store.adoptFieldsIfInPlay() },
             onMenu: { store.openProjectMenu() }
         )
     }

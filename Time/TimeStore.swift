@@ -201,6 +201,16 @@ final class TimeStore: ObservableObject {
         }
     }
 
+    func adoptFieldsIfInPlay() {
+        rememberClient()
+        rememberProject()
+        guard isRunning || isPaused else { return }
+        let key = currentIdentityKey
+        let clockKey = ParkedSession.identityKey(client: clockClient, project: clockProject, workType: clockWorkType)
+        guard key != clockKey else { return }
+        start()
+    }
+
     func start() {
         rememberClient()
         rememberProject()

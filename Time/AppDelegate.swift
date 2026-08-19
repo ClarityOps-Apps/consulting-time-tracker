@@ -401,7 +401,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     @objc func pickClient(_ sender: NSMenuItem) {
         guard let name = sender.representedObject as? String else { return }
         store.client = name
-        store.rememberClient()
+        store.adoptFieldsIfInPlay()
     }
 
     @objc func popProjectMenu() {
@@ -431,7 +431,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     @objc func pickProject(_ sender: NSMenuItem) {
         guard let name = sender.representedObject as? String else { return }
         store.project = name
-        store.rememberProject()
+        store.adoptFieldsIfInPlay()
     }
 
     @objc func showColors() {
