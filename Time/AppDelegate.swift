@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var reportWindow: NSWindow?
     private var editorWindow: NSWindow?
     private var clientsWindow: NSWindow?
+    private var projectsWindow: NSWindow?
     private var colorsWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
     private var revealInFlight = false
@@ -44,6 +45,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
         store.onOpenClients = { [weak self] in
             self?.showClients()
+        }
+        store.onOpenProjectMenu = { [weak self] in
+            self?.popProjectMenu()
+        }
+        store.onOpenProjects = { [weak self] in
+            self?.showProjects()
         }
         store.onOpenDateRangeMenu = { [weak self] in
             self?.popDateRangeMenu()
@@ -260,6 +267,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         retreatIfNoWindows()
     }
 
+    @objc func showProjects() {
+        if projectsWindow == nil {
+            projectsWindow = makeWindow(
+                title: "Edit list…",
+                size: NSSize(width: 320, height: 420),
+                root: ProjectEditor(store: store) { [weak self] in
+                    self?.closeProjects()
+                }
+            )
+        }
+        present(projectsWindow)
+    }
+
+    func closeProjects() {
+        projectsWindow?.orderOut(nil)
+        retreatIfNoWindows()
+    }
+
     @objc func popWorkTypeMenu() {
         let menu = NSMenu()
         for item in store.workTypes {
@@ -345,6 +370,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         store.rememberClient()
     }
 
+    @objc func popProjectMenu() {
+        store.rememberProject()
+        let menu = NSMenu()
+        for item in store.visibleProjects {
+            let row = NSMenuItem(title: item.name, action: #selector(pickProject(_:)), keyEquivalent: "")
+            row.target = self
+            row.representedObject = item.name
+            if item.name == store.project {
+                row.state = .on
+            }
+            menu.addItem(row)
+        }
+        menu.addItem(.separator())
+        let edit = NSMenuItem(title: "Edit list…", action: #selector(showProjects), keyEquivalent: "")
+        edit.target = self
+        menu.addItem(edit)
+        if let event = NSApp.currentEvent, let view = timeWindow?.contentView {
+            NSMenu.popUpContextMenu(menu, with: event, for: view)
+        } else if let view = timeWindow?.contentView {
+            let point = NSPoint(x: view.bounds.maxX - 40, y: view.bounds.midY)
+            menu.popUp(positioning: nil, at: point, in: view)
+        }
+    }
+
+    @objc func pickProject(_ sender: NSMenuItem) {
+        guard let name = sender.representedObject as? String else { return }
+        store.project = name
+        store.rememberProject()
+    }
+
     @objc func showColors() {
         if colorsWindow == nil {
             colorsWindow = makeWindow(
@@ -399,7 +454,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     private func retreatIfNoWindows() {
-        let anyVisible = [timeWindow, historyWindow, reportWindow, editorWindow, clientsWindow, colorsWindow]
+        let anyVisible = [timeWindow, historyWindow, reportWindow, editorWindow, clientsWindow, projectsWindow, colorsWindow]
             .compactMap { $0 }
             .contains { $0.isVisible }
         if !anyVisible {

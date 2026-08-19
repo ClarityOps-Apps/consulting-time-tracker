@@ -184,6 +184,7 @@ final class TimeStore: ObservableObject {
             NSLog("Time: could not save entry: \(error)")
         }
         rememberClient()
+        rememberProject()
         isRunning = false
         isPaused = false
         runningStartedAt = nil
@@ -279,6 +280,65 @@ final class TimeStore: ObservableObject {
         }
     }
 
+
+    func addProject(_ raw: String) {
+        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        guard !projects.contains(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else { return }
+        do {
+            try db.insertProject(name: name, sortOrder: projects.count)
+            reloadProjects()
+        } catch {
+            NSLog("Time: could not add project: \(error)")
+        }
+    }
+
+    func renameProject(_ item: ProjectItem, to raw: String) {
+        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        do {
+            try db.renameProject(id: item.id, name: name)
+            if project == item.name {
+                project = name
+            }
+            reloadProjects()
+            reloadEntries()
+            persistFormAndRunning()
+        } catch {
+            NSLog("Time: could not rename project: \(error)")
+        }
+    }
+
+    func archiveProject(_ item: ProjectItem) {
+        do {
+            try db.setProjectArchived(id: item.id, archived: true)
+            reloadProjects()
+        } catch {
+            NSLog("Time: could not archive project: \(error)")
+        }
+    }
+
+    func unhideProject(_ item: ProjectItem) {
+        do {
+            try db.setProjectArchived(id: item.id, archived: false)
+            reloadProjects()
+        } catch {
+            NSLog("Time: could not unhide project: \(error)")
+        }
+    }
+
+    func rememberProject(_ raw: String? = nil) {
+        let name = (raw ?? project).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        if projects.contains(where: { $0.name == name }) { return }
+        do {
+            try db.insertProject(name: name, sortOrder: projects.count)
+            reloadProjects()
+        } catch {
+            NSLog("Time: could not remember project: \(error)")
+        }
+    }
+
     func removeWorkType(_ item: WorkTypeItem) {
         do {
             try db.deleteWorkType(id: item.id)
@@ -300,6 +360,7 @@ final class TimeStore: ObservableObject {
     private func reload() {
         reloadWorkTypes()
         reloadClients()
+        reloadProjects()
         reloadEntries()
         loadPalette()
         workType = db.setting("work_type") ?? ""
@@ -314,6 +375,10 @@ final class TimeStore: ObservableObject {
 
     private func reloadClients() {
         clients = db.clients()
+    }
+
+    private func reloadProjects() {
+        projects = db.projects()
     }
 
     private func reloadEntries() {
@@ -410,6 +475,15 @@ final class TimeStore: ObservableObject {
         onOpenClients?()
     }
 
+    func openProjectMenu() {
+        rememberProject()
+        onOpenProjectMenu?()
+    }
+
+    func openProjects() {
+        onOpenProjects?()
+    }
+
     func openDateRangeMenu() {
         onOpenDateRangeMenu?()
     }
@@ -441,11 +515,13 @@ final class TimeStore: ObservableObject {
     }
 
     func filteredEntries() -> [TimeEntry] {
-        let hidden = archivedClientNames
+        let hiddenClients = archivedClientNames
+        let hiddenProjects = archivedProjectNames
         return entries(in: dateRange, customStart: customStart, customEnd: customEnd)
             .filter { entry in
-                if entry.client.isEmpty { return true }
-                return !hidden.contains(entry.client)
+                if !entry.client.isEmpty && hiddenClients.contains(entry.client) { return false }
+                if !entry.project.isEmpty && hiddenProjects.contains(entry.project) { return false }
+                return true
             }
     }
 }

@@ -4,6 +4,7 @@ struct TimeWindowView: View {
     @ObservedObject var store: TimeStore
     @State private var clockPulse = false
     @FocusState private var clientFocused: Bool
+    @FocusState private var projectFocused: Bool
     private var palette: Palette { store.palette }
 
     var body: some View {
@@ -44,11 +45,7 @@ struct TimeWindowView: View {
             VStack(spacing: 0) {
                 fieldRow("Work type") { workTypeControl }
                 fieldRow("Client") { clientControl }
-                fieldRow("Project") {
-                    TextField("", text: $store.project)
-                        .textFieldStyle(.plain)
-                        .modifier(QuietField(palette: palette))
-                }
+                fieldRow("Project") { projectControl }
                 fieldRow("Billable") {
                     LookCheckbox(isOn: $store.billable, palette: palette)
                 }
@@ -134,6 +131,30 @@ struct TimeWindowView: View {
             content()
         }
         .frame(minHeight: 32)
+    }
+
+
+    private var projectControl: some View {
+        HStack(spacing: 4) {
+            TextField("", text: $store.project)
+                .textFieldStyle(.plain)
+                .focused($projectFocused)
+                .onSubmit { store.rememberProject() }
+                .onChange(of: projectFocused) { _, focused in
+                    if !focused { store.rememberProject() }
+                }
+            Button {
+                store.openProjectMenu()
+            } label: {
+                Image(systemName: "arrowtriangle.down.fill")
+                    .font(.system(size: 6, weight: .bold))
+                    .foregroundStyle(palette.font)
+                    .frame(width: 12, height: 16)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .modifier(QuietField(palette: palette))
     }
 
     private var clientControl: some View {
