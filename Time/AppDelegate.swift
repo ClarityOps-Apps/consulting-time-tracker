@@ -152,7 +152,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             popStatusMenu()
             return
         }
-        toggleTimeWindow()
+        showTimeWindow()
     }
 
     private func popStatusMenu() {
@@ -298,12 +298,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         window.level = .floating
         window.hidesOnDeactivate = false
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .moveToActiveSpace]
-        if let screen = NSScreen.main, !screen.visibleFrame.intersects(window.frame) {
-            window.center()
-        }
+        placeBelowStatusItem(window)
+        window.alphaValue = 1
         window.orderFrontRegardless()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func placeBelowStatusItem(_ window: NSWindow) {
+        let size = window.frame.size.width > 10
+            ? window.frame.size
+            : NSSize(width: 280, height: 400)
+        var origin = NSPoint.zero
+        if let button = statusItem?.button {
+            let local = button.convert(button.bounds, to: nil)
+            let screenRect = button.window?.convertToScreen(local) ?? local
+            origin = NSPoint(
+                x: screenRect.midX - size.width / 2,
+                y: screenRect.minY - size.height - 10
+            )
+            if let screen = button.window?.screen ?? NSScreen.main {
+                let vf = screen.visibleFrame
+                origin.x = min(max(origin.x, vf.minX + 12), vf.maxX - size.width - 12)
+                origin.y = min(max(origin.y, vf.minY + 12), vf.maxY - size.height - 12)
+            }
+        } else if let screen = NSScreen.main {
+            origin = NSPoint(
+                x: screen.visibleFrame.midX - size.width / 2,
+                y: screen.visibleFrame.midY - size.height / 2
+            )
+        }
+        window.setFrame(NSRect(origin: origin, size: size), display: true)
     }
 
     private func retreatIfNoWindows() {
