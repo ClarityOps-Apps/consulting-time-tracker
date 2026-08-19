@@ -8,18 +8,9 @@ struct TimeWindowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("Time")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(palette.quiet)
-                Spacer()
-                Button("Colors") {
-                    store.openColors()
-                }
-                .buttonStyle(.plain)
+            Text("Time")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(palette.quiet)
-            }
 
             Text(DurationFormat.clock(store.displaySeconds))
                 .font(.system(size: 34, weight: .semibold))
