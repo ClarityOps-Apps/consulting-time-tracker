@@ -123,6 +123,10 @@ struct WorkTypeEditor: View {
     }
 
     private func commitAll() {
+        let pending = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !pending.isEmpty {
+            add()
+        }
         for item in store.items(for: kind) {
             commit(item)
         }
