@@ -95,7 +95,7 @@ final class TimeStore: ObservableObject {
     }
 
     var archivedClientNames: Set<String> {
-        Set(archivedClients.map(\.name))
+        Set(archivedClients.map(\.name).filter { !$0.isEmpty })
     }
 
     var visibleProjects: [ProjectItem] {
@@ -107,7 +107,7 @@ final class TimeStore: ObservableObject {
     }
 
     var archivedProjectNames: Set<String> {
-        Set(archivedProjects.map(\.name))
+        Set(archivedProjects.map(\.name).filter { !$0.isEmpty })
     }
 
     var todaySeconds: Int {
@@ -232,6 +232,7 @@ final class TimeStore: ObservableObject {
     }
 
     func archiveClient(_ item: ClientItem) {
+        guard !item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         do {
             try db.setArchived(id: item.id, archived: true)
             reloadClients()
@@ -280,6 +281,7 @@ final class TimeStore: ObservableObject {
     }
 
     func archiveProject(_ item: ProjectItem) {
+        guard !item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         do {
             try db.setProjectArchived(id: item.id, archived: true)
             reloadProjects()
@@ -411,8 +413,24 @@ final class TimeStore: ObservableObject {
     func removeItem(_ item: NamedListItem, kind: NamedListKind) {
         switch kind {
         case .workType: removeWorkType(item)
-        case .client: removeClient(item)
-        case .project: removeProject(item)
+        case .client: break
+        case .project: break
+        }
+    }
+
+    func archiveItem(_ item: NamedListItem, kind: NamedListKind) {
+        switch kind {
+        case .workType: break
+        case .client: archiveClient(item)
+        case .project: archiveProject(item)
+        }
+    }
+
+    func unhideItem(_ item: NamedListItem, kind: NamedListKind) {
+        switch kind {
+        case .workType: break
+        case .client: unhideClient(item)
+        case .project: unhideProject(item)
         }
     }
 
@@ -459,6 +477,8 @@ final class TimeStore: ObservableObject {
         workType = row.workType
         billable = row.billable
         isRunning = true
+        if archivedClientNames.contains(client) { client = "" }
+        if archivedProjectNames.contains(project) { project = "" }
     }
 
     private func persistForm() {

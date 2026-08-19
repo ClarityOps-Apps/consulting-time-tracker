@@ -9,6 +9,7 @@ struct WorkTypeEditor: View {
 
     private var palette: Palette { store.palette }
     private var items: [NamedListItem] { store.items(for: kind) }
+    private var usesArchive: Bool { kind == .client || kind == .project }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -29,15 +30,37 @@ struct WorkTypeEditor: View {
                     HStack {
                         TextField("", text: binding(for: item))
                             .textFieldStyle(.plain)
+                            .foregroundStyle(item.archived ? palette.quiet : palette.font)
                             .onSubmit { commit(item) }
-                        Button {
-                            store.removeItem(item, kind: kind)
-                            draft[item.id] = nil
-                        } label: {
-                            Image(systemName: "minus.circle")
+                        if usesArchive {
+                            if item.archived {
+                                Button("Unhide") {
+                                    commit(item)
+                                    store.unhideItem(item, kind: kind)
+                                }
+                                .buttonStyle(.borderless)
+                                .font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(palette.quiet)
+                            } else {
+                                Button("Archive") {
+                                    commit(item)
+                                    store.archiveItem(item, kind: kind)
+                                    draft[item.id] = nil
+                                }
+                                .buttonStyle(.borderless)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(palette.quiet)
+                            }
+                        } else {
+                            Button {
+                                store.removeItem(item, kind: kind)
+                                draft[item.id] = nil
+                            } label: {
+                                Image(systemName: "minus.circle")
+                                    .foregroundStyle(palette.quiet)
+                            }
+                            .buttonStyle(.borderless)
                         }
-                        .buttonStyle(.borderless)
                     }
                 }
             }

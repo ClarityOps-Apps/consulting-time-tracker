@@ -255,7 +255,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             clientsWindow = makeWindow(
                 title: "Edit list…",
                 size: NSSize(width: 320, height: 420),
-                root: ClientEditor(store: store) { [weak self] in
+                root: WorkTypeEditor(store: store, kind: .client) { [weak self] in
                     self?.closeClients()
                 }
             )
@@ -273,7 +273,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             projectsWindow = makeWindow(
                 title: "Edit list…",
                 size: NSSize(width: 320, height: 420),
-                root: ProjectEditor(store: store) { [weak self] in
+                root: WorkTypeEditor(store: store, kind: .project) { [weak self] in
                     self?.closeProjects()
                 }
             )
