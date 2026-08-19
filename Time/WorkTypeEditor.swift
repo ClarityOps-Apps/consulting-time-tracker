@@ -2,7 +2,7 @@ import SwiftUI
 
 struct WorkTypeEditor: View {
     @ObservedObject var store: TimeStore
-    @Environment(\.dismiss) private var dismiss
+    var onDone: () -> Void
     @State private var draft: [Int64: String] = [:]
     @State private var newName = ""
 
@@ -10,9 +10,17 @@ struct WorkTypeEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Edit list…")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(palette.quiet)
+            HStack {
+                Text("Edit list…")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(palette.quiet)
+                Spacer()
+                Button("Done") {
+                    commitAll()
+                    onDone()
+                }
+                .buttonStyle(SmallActionButtonStyle(color: palette.action))
+            }
 
             List {
                 ForEach(store.workTypes) { item in

@@ -79,7 +79,9 @@ struct TimeWindowView: View {
         .background(palette.window)
         .tint(palette.action)
         .sheet(isPresented: $showEditor) {
-            WorkTypeEditor(store: store)
+            WorkTypeEditor(store: store) {
+                showEditor = false
+            }
         }
     }
 
