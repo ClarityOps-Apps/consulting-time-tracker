@@ -16,6 +16,7 @@ final class TimeStore: ObservableObject {
     @Published var dateRange: DateRangeKind = .thisWeek
     @Published var customStart = Date()
     @Published var customEnd = Date()
+    var onOpenWorkTypes: (() -> Void)?
 
     private let db: Database
     private var tickTimer: Timer?
@@ -217,6 +218,10 @@ final class TimeStore: ObservableObject {
         } catch {
             NSLog("Time: could not save running session: \(error)")
         }
+    }
+
+    func openWorkTypes() {
+        onOpenWorkTypes?()
     }
 
     func filteredEntries() -> [TimeEntry] {

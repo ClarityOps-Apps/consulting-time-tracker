@@ -2,8 +2,6 @@ import SwiftUI
 
 struct TimeWindowView: View {
     @ObservedObject var store: TimeStore
-    @State private var showEditor = false
-
     private var palette: Palette { store.palette }
 
     var body: some View {
@@ -69,11 +67,6 @@ struct TimeWindowView: View {
         .frame(width: 280)
         .background(palette.window)
         .tint(palette.action)
-        .sheet(isPresented: $showEditor) {
-            WorkTypeEditor(store: store) {
-                showEditor = false
-            }
-        }
     }
 
     private func fieldRow<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
@@ -96,7 +89,7 @@ struct TimeWindowView: View {
             }
             Divider()
             Button("Edit list…") {
-                showEditor = true
+                store.openWorkTypes()
             }
         } label: {
             HStack {

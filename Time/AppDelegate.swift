@@ -8,10 +8,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var timeWindow: NSWindow?
     private var historyWindow: NSWindow?
     private var reportWindow: NSWindow?
+    private var editorWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        store.onOpenWorkTypes = { [weak self] in
+            self?.showWorkTypes()
+        }
         buildStatusItem()
         showTimeWindow()
         store.objectWillChange
@@ -88,6 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         timeWindow?.backgroundColor = color
         historyWindow?.backgroundColor = color
         reportWindow?.backgroundColor = color
+        editorWindow?.backgroundColor = color
     }
 
     @objc func toggleTimer() {
@@ -126,6 +131,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             )
         }
         present(reportWindow)
+    }
+
+    @objc func showWorkTypes() {
+        if editorWindow == nil {
+            editorWindow = makeWindow(
+                title: "Edit list…",
+                size: NSSize(width: 320, height: 420),
+                root: WorkTypeEditor(store: store) { [weak self] in
+                    self?.closeWorkTypes()
+                }
+            )
+        }
+        present(editorWindow)
+    }
+
+    func closeWorkTypes() {
+        editorWindow?.orderOut(nil)
     }
 
     @objc func quit() {
