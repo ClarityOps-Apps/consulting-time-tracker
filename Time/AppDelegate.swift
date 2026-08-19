@@ -32,6 +32,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         store.onOpenWorkTypeMenu = { [weak self] in
             self?.popWorkTypeMenu()
         }
+        store.onOpenDateRangeMenu = { [weak self] in
+            self?.popDateRangeMenu()
+        }
         buildStatusItem()
         showTimeWindow()
         store.objectWillChange
@@ -206,6 +209,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             let point = NSPoint(x: view.bounds.maxX - 40, y: view.bounds.midY)
             menu.popUp(positioning: nil, at: point, in: view)
         }
+    }
+
+    @objc func popDateRangeMenu() {
+        let menu = NSMenu()
+        for item in DateRangeKind.allCases {
+            let row = NSMenuItem(title: item.rawValue, action: #selector(pickDateRange(_:)), keyEquivalent: "")
+            row.target = self
+            row.representedObject = item.rawValue
+            if item == store.dateRange {
+                row.state = .on
+            }
+            menu.addItem(row)
+        }
+        if let event = NSApp.currentEvent {
+            if let view = historyWindow?.contentView, historyWindow?.isKeyWindow == true {
+                NSMenu.popUpContextMenu(menu, with: event, for: view)
+            } else if let view = reportWindow?.contentView, reportWindow?.isKeyWindow == true {
+                NSMenu.popUpContextMenu(menu, with: event, for: view)
+            } else if let view = NSApp.keyWindow?.contentView {
+                NSMenu.popUpContextMenu(menu, with: event, for: view)
+            }
+        }
+    }
+
+    @objc func pickDateRange(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let kind = DateRangeKind(rawValue: raw) else { return }
+        store.dateRange = kind
     }
 
     @objc func pickWorkType(_ sender: NSMenuItem) {

@@ -10,7 +10,9 @@ struct DateRangeBar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center) {
-                ZStack(alignment: .leading) {
+                Button {
+                    store.openDateRangeMenu()
+                } label: {
                     HStack {
                         Text(store.dateRange.rawValue)
                             .foregroundStyle(palette.font)
@@ -21,14 +23,8 @@ struct DateRangeBar: View {
                             .foregroundStyle(palette.font)
                     }
                     .modifier(QuietField(palette: palette))
-                    Picker("", selection: $store.dateRange) {
-                        ForEach(DateRangeKind.allCases) { item in
-                            Text(item.rawValue).tag(item)
-                        }
-                    }
-                    .labelsHidden()
-                    .opacity(0.02)
                 }
+                .buttonStyle(.plain)
                 Spacer()
                 if showSave {
                     Button("Save CSV") { onSave?() }

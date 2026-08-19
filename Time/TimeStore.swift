@@ -25,6 +25,7 @@ final class TimeStore: ObservableObject {
     var onOpenHistory: (() -> Void)?
     var onOpenReport: (() -> Void)?
     var onOpenWorkTypeMenu: (() -> Void)?
+    var onOpenDateRangeMenu: (() -> Void)?
 
     private let db: Database
     private var tickTimer: Timer?
@@ -303,6 +304,10 @@ final class TimeStore: ObservableObject {
 
     func openWorkTypeMenu() {
         onOpenWorkTypeMenu?()
+    }
+
+    func openDateRangeMenu() {
+        onOpenDateRangeMenu?()
     }
 
     func openColors() {
