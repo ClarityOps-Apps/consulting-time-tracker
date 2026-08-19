@@ -70,12 +70,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         revealTime()
     }
 
-    func applicationDidBecomeActive(_ notification: Notification) {
-        if revealInFlight { return }
-        let anyVisible = [timeWindow, historyWindow, reportWindow].compactMap { $0 }.contains { $0.isVisible }
-        if !anyVisible { revealTime() }
-    }
-
     private func revealTime() {
         if revealInFlight { return }
         revealInFlight = true
@@ -383,12 +377,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     func windowWillMiniaturize(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
-        DispatchQueue.main.async {
-            if window.isMiniaturized {
-                window.deminiaturize(nil)
-            }
-            window.orderOut(nil)
-            self.retreatIfNoWindows()
-        }
+        window.orderOut(nil)
+        retreatIfNoWindows()
     }
 }
