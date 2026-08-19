@@ -21,6 +21,7 @@ final class TimeStore: ObservableObject {
     @Published var customEnd = Date()
     var onOpenWorkTypes: (() -> Void)?
     var onOpenColors: (() -> Void)?
+    var onOpenTime: (() -> Void)?
     var onOpenHistory: (() -> Void)?
     var onOpenReport: (() -> Void)?
     var onOpenWorkTypeMenu: (() -> Void)?
@@ -286,6 +287,10 @@ final class TimeStore: ObservableObject {
 
     func openWorkTypes() {
         onOpenWorkTypes?()
+    }
+
+    func openTime() {
+        onOpenTime?()
     }
 
     func openHistory() {

@@ -62,6 +62,20 @@ struct ReportView: View {
                     palette.line.frame(height: 1)
                 }
             }
+
+            HStack(spacing: 8) {
+                Spacer()
+                Button("Time") { store.openTime() }
+                    .buttonStyle(.plain)
+                Button("History") { store.openHistory() }
+                    .buttonStyle(.plain)
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(palette.quiet)
+            .padding(.top, 8)
+            .overlay(alignment: .top) {
+                palette.line.frame(height: 1)
+            }
         }
         .padding(16)
         .frame(minWidth: 380, idealWidth: 400, maxWidth: 400, minHeight: 420)

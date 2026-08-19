@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import Combine
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate {
     let store = TimeStore()
     private var statusItem: NSStatusItem?
     private var timeWindow: NSWindow?
@@ -19,6 +19,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         store.onOpenColors = { [weak self] in
             self?.showColors()
+        }
+        store.onOpenTime = { [weak self] in
+            self?.showTimeWindow()
         }
         store.onOpenHistory = { [weak self] in
             self?.showHistory()
@@ -240,7 +243,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         window.backgroundColor = store.palette.nsWindow
         window.appearance = NSAppearance(named: .aqua)
         window.isReleasedWhenClosed = false
+        window.delegate = self
+        window.standardWindowButton(.closeButton)?.isEnabled = true
+        window.standardWindowButton(.closeButton)?.isHidden = false
         window.center()
         return window
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        sender.orderOut(nil)
+        return false
     }
 }

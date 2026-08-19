@@ -104,11 +104,15 @@ struct HistoryView: View {
                 }
             }
 
-            HStack {
+            HStack(spacing: 8) {
                 Text(store.dateRange.rawValue)
-                Spacer()
                 Text(DurationFormat.clock(totalSeconds))
                     .monospacedDigit()
+                Spacer()
+                Button("Time") { store.openTime() }
+                    .buttonStyle(.plain)
+                Button("Report") { store.openReport() }
+                    .buttonStyle(.plain)
             }
             .font(.system(size: 11))
             .foregroundStyle(palette.quiet)
