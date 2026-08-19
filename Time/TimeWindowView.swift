@@ -2,7 +2,7 @@ import SwiftUI
 
 struct TimeWindowView: View {
     @ObservedObject var store: TimeStore
-    @State private var bandShown = false
+    @State private var clockPulse = false
     private var palette: Palette { store.palette }
 
     var body: some View {
@@ -11,12 +11,23 @@ struct TimeWindowView: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(palette.quiet)
 
-            clockFace
-                .frame(maxWidth: .infinity)
+            Text(DurationFormat.clock(store.displaySeconds))
+                .font(.system(size: 34, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(store.isRunning ? palette.font : palette.quiet)
+                .scaleEffect(store.isRunning && clockPulse ? 1.035 : 1)
+                .opacity(store.isRunning && clockPulse ? 0.78 : 1)
+                .animation(
+                    store.isRunning
+                        ? .easeInOut(duration: 1.0).repeatForever(autoreverses: true)
+                        : .easeOut(duration: 0.35),
+                    value: clockPulse
+                )
+                .frame(maxWidth: .infinity, minHeight: 42)
                 .padding(.top, 14)
-                .onAppear { setBand(store.isRunning) }
+                .onAppear { kickPulse(store.isRunning) }
                 .onChange(of: store.isRunning) { _, running in
-                    setBand(running)
+                    kickPulse(running)
                 }
 
             Text(store.isRunning ? store.runningSubtitle : " ")
@@ -71,46 +82,11 @@ struct TimeWindowView: View {
         .tint(palette.action)
     }
 
-    private var clockFace: some View {
-        ZStack {
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !bandShown && !store.isRunning)) { timeline in
-                GeometryReader { geo in
-                    let cycle = 5.0
-                    let phase = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: cycle) / cycle
-                    let x = geo.size.width * (-0.18 + 1.36 * phase)
-                    Ellipse()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    palette.action.opacity(0.42),
-                                    palette.action.opacity(0.14),
-                                    palette.action.opacity(0)
-                                ],
-                                center: .center,
-                                startRadius: 1,
-                                endRadius: 38
-                            )
-                        )
-                        .frame(width: 96, height: 46)
-                        .position(x: x, y: geo.size.height / 2)
-                        .blur(radius: 10)
-                        .scaleEffect(bandShown ? 1 : 0.55)
-                        .opacity(bandShown ? 1 : 0)
-                }
-            }
-            .allowsHitTesting(false)
-
-            Text(DurationFormat.clock(store.displaySeconds))
-                .font(.system(size: 34, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(store.isRunning ? palette.font : palette.quiet)
-        }
-        .frame(height: 42)
-    }
-
-    private func setBand(_ running: Bool) {
-        withAnimation(.easeOut(duration: 0.4)) {
-            bandShown = running
+    private func kickPulse(_ running: Bool) {
+        clockPulse = false
+        guard running else { return }
+        DispatchQueue.main.async {
+            clockPulse = true
         }
     }
 
