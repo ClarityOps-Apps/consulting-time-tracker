@@ -2,11 +2,13 @@ import SwiftUI
 
 struct WorkTypeEditor: View {
     @ObservedObject var store: TimeStore
+    var kind: NamedListKind = .workType
     var onDone: () -> Void
     @State private var draft: [Int64: String] = [:]
     @State private var newName = ""
 
     private var palette: Palette { store.palette }
+    private var items: [NamedListItem] { store.items(for: kind) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -23,13 +25,13 @@ struct WorkTypeEditor: View {
             }
 
             List {
-                ForEach(store.workTypes) { item in
+                ForEach(items) { item in
                     HStack {
                         TextField("", text: binding(for: item))
                             .textFieldStyle(.plain)
                             .onSubmit { commit(item) }
                         Button {
-                            store.removeWorkType(item)
+                            store.removeItem(item, kind: kind)
                             draft[item.id] = nil
                         } label: {
                             Image(systemName: "minus.circle")
@@ -66,10 +68,10 @@ struct WorkTypeEditor: View {
         .frame(width: 300, height: 380)
         .background(palette.window)
         .onAppear {
-            draft = Dictionary(uniqueKeysWithValues: store.workTypes.map { ($0.id, $0.name) })
+            draft = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0.name) })
         }
-        .onChange(of: store.workTypes) { _, items in
-            for item in items where draft[item.id] == nil {
+        .onChange(of: items) { _, rows in
+            for item in rows where draft[item.id] == nil {
                 draft[item.id] = item.name
             }
         }
@@ -78,7 +80,7 @@ struct WorkTypeEditor: View {
         }
     }
 
-    private func binding(for item: WorkTypeItem) -> Binding<String> {
+    private func binding(for item: NamedListItem) -> Binding<String> {
         Binding(
             get: { draft[item.id] ?? item.name },
             set: { draft[item.id] = $0 }
@@ -86,19 +88,19 @@ struct WorkTypeEditor: View {
     }
 
     private func add() {
-        store.addWorkType(newName)
+        store.addItem(newName, kind: kind)
         newName = ""
-        draft = Dictionary(uniqueKeysWithValues: store.workTypes.map { ($0.id, $0.name) })
+        draft = Dictionary(uniqueKeysWithValues: store.items(for: kind).map { ($0.id, $0.name) })
     }
 
-    private func commit(_ item: WorkTypeItem) {
+    private func commit(_ item: NamedListItem) {
         if let name = draft[item.id] {
-            store.renameWorkType(item, to: name)
+            store.renameItem(item, to: name, kind: kind)
         }
     }
 
     private func commitAll() {
-        for item in store.workTypes {
+        for item in store.items(for: kind) {
             commit(item)
         }
     }

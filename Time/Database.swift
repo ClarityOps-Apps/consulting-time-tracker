@@ -87,25 +87,46 @@ final class Database {
                 value TEXT NOT NULL
             );
             """)
-        try exec("""
-            CREATE TABLE IF NOT EXISTS clients (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL UNIQUE,
-                sort_order INTEGER NOT NULL,
-                archived INTEGER NOT NULL DEFAULT 0
-            );
-            """)
-        try exec("""
-            CREATE TABLE IF NOT EXISTS projects (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL UNIQUE,
-                sort_order INTEGER NOT NULL,
-                archived INTEGER NOT NULL DEFAULT 0
-            );
-            """)
+        try ensureNameListTable("clients")
+        try ensureNameListTable("projects")
         try seedWorkTypesIfNeeded()
-        try seedClientsFromHistory()
-        try seedProjectsFromHistory()
+        try seedNameListIfNeeded(table: "clients", column: "client")
+        try seedNameListIfNeeded(table: "projects", column: "project")
+    }
+
+    private func ensureNameListTable(_ table: String) throws {
+        try exec("""
+            CREATE TABLE IF NOT EXISTS \(table) (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                sort_order INTEGER NOT NULL
+            );
+            """)
+        guard tableHasColumn(table, "archived") else { return }
+        let simple = "\(table)_v1"
+        try exec("""
+            CREATE TABLE \(simple) (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                sort_order INTEGER NOT NULL
+            );
+            """)
+        try exec("INSERT OR IGNORE INTO \(simple)(id, name, sort_order) SELECT id, name, sort_order FROM \(table);")
+        try exec("DROP TABLE \(table);")
+        try exec("ALTER TABLE \(simple) RENAME TO \(table);")
+    }
+
+    private func tableHasColumn(_ table: String, _ column: String) -> Bool {
+        var stmt: OpaquePointer?
+        let sql = "PRAGMA table_info(\(table));"
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return false }
+        defer { sqlite3_finalize(stmt) }
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let cString = sqlite3_column_text(stmt, 1), String(cString: cString) == column {
+                return true
+            }
+        }
+        return false
     }
 
     private static let starterWorkTypes = [
@@ -124,16 +145,18 @@ final class Database {
         let count = scalarInt("SELECT COUNT(*) FROM work_types;")
         guard count == 0 else { return }
         for (index, name) in Self.starterWorkTypes.enumerated() {
-            try insertWorkType(name: name, sortOrder: index)
+            try insertListItem(table: "work_types", name: name, sortOrder: index)
         }
     }
 
-    private func seedClientsFromHistory() throws {
+    private func seedNameListIfNeeded(table: String, column: String) throws {
+        let count = scalarInt("SELECT COUNT(*) FROM \(table);")
+        guard count == 0 else { return }
         var names: [String] = []
         var seen = Set<String>()
         let queries = [
-            "SELECT DISTINCT TRIM(client) FROM entries WHERE TRIM(client) != '';",
-            "SELECT TRIM(client) FROM running_session WHERE id = 1 AND TRIM(client) != '';",
+            "SELECT DISTINCT TRIM(\(column)) FROM entries WHERE TRIM(\(column)) != '';",
+            "SELECT TRIM(\(column)) FROM running_session WHERE id = 1 AND TRIM(\(column)) != '';",
         ]
         for sql in queries {
             for raw in stringColumn(sql) {
@@ -142,33 +165,8 @@ final class Database {
                 }
             }
         }
-        let existing = Set(clients().map(\.name))
-        var order = clients().map(\.sortOrder).max() ?? -1
-        for name in names where !existing.contains(name) {
-            order += 1
-            try insertClient(name: name, sortOrder: order)
-        }
-    }
-
-    private func seedProjectsFromHistory() throws {
-        var names: [String] = []
-        var seen = Set<String>()
-        let queries = [
-            "SELECT DISTINCT TRIM(project) FROM entries WHERE TRIM(project) != '';",
-            "SELECT TRIM(project) FROM running_session WHERE id = 1 AND TRIM(project) != '';",
-        ]
-        for sql in queries {
-            for raw in stringColumn(sql) {
-                if seen.insert(raw).inserted {
-                    names.append(raw)
-                }
-            }
-        }
-        let existing = Set(projects().map(\.name))
-        var order = projects().map(\.sortOrder).max() ?? -1
-        for name in names where !existing.contains(name) {
-            order += 1
-            try insertProject(name: name, sortOrder: order)
+        for (index, name) in names.enumerated() {
+            try insertListItem(table: table, name: name, sortOrder: index)
         }
     }
 
@@ -221,130 +219,63 @@ final class Database {
         }
     }
 
-    func workTypes() -> [WorkTypeItem] {
-        var stmt: OpaquePointer?
-        let sql = "SELECT id, name, sort_order FROM work_types ORDER BY sort_order, name;"
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-        defer { sqlite3_finalize(stmt) }
-        var items: [WorkTypeItem] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            let id = sqlite3_column_int64(stmt, 0)
-            let name = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
-            let order = Int(sqlite3_column_int(stmt, 2))
-            items.append(WorkTypeItem(id: id, name: name, sortOrder: order))
-        }
-        return items
-    }
+    func workTypes() -> [WorkTypeItem] { listItems("work_types") }
+    func clients() -> [ClientItem] { listItems("clients") }
+    func projects() -> [ProjectItem] { listItems("projects") }
 
     func insertWorkType(name: String, sortOrder: Int) throws {
-        let sql = "INSERT INTO work_types(name, sort_order) VALUES(?, ?);"
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            throw DatabaseError.exec(lastError())
-        }
-        defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_text(stmt, 1, name, -1, SQLITE_TRANSIENT)
-        sqlite3_bind_int(stmt, 2, Int32(sortOrder))
-        if sqlite3_step(stmt) != SQLITE_DONE {
-            throw DatabaseError.exec(lastError())
-        }
+        try insertListItem(table: "work_types", name: name, sortOrder: sortOrder)
     }
 
     func renameWorkType(id: Int64, name: String) throws {
-        let sql = "UPDATE work_types SET name = ? WHERE id = ?;"
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            throw DatabaseError.exec(lastError())
-        }
-        defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_text(stmt, 1, name, -1, SQLITE_TRANSIENT)
-        sqlite3_bind_int64(stmt, 2, id)
-        if sqlite3_step(stmt) != SQLITE_DONE {
-            throw DatabaseError.exec(lastError())
-        }
+        try renameListItem(table: "work_types", id: id, name: name, rewriteColumn: nil)
     }
 
     func deleteWorkType(id: Int64) throws {
-        let sql = "DELETE FROM work_types WHERE id = ?;"
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            throw DatabaseError.exec(lastError())
-        }
-        defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_int64(stmt, 1, id)
-        if sqlite3_step(stmt) != SQLITE_DONE {
-            throw DatabaseError.exec(lastError())
-        }
+        try deleteListItem(table: "work_types", id: id)
     }
 
-    func clients() -> [ClientItem] {
-        var stmt: OpaquePointer?
-        let sql = "SELECT id, name, sort_order, archived FROM clients ORDER BY sort_order, name;"
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-        defer { sqlite3_finalize(stmt) }
-        var items: [ClientItem] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            let id = sqlite3_column_int64(stmt, 0)
-            let name = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
-            let order = Int(sqlite3_column_int(stmt, 2))
-            let archived = sqlite3_column_int(stmt, 3) != 0
-            items.append(ClientItem(id: id, name: name, sortOrder: order, archived: archived))
-        }
-        return items
-    }
-
-    func insertClient(name: String, sortOrder: Int, archived: Bool = false) throws {
-        let sql = "INSERT INTO clients(name, sort_order, archived) VALUES(?, ?, ?);"
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            throw DatabaseError.exec(lastError())
-        }
-        defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_text(stmt, 1, name, -1, SQLITE_TRANSIENT)
-        sqlite3_bind_int(stmt, 2, Int32(sortOrder))
-        sqlite3_bind_int(stmt, 3, archived ? 1 : 0)
-        if sqlite3_step(stmt) != SQLITE_DONE {
-            throw DatabaseError.exec(lastError())
-        }
+    func insertClient(name: String, sortOrder: Int) throws {
+        try insertListItem(table: "clients", name: name, sortOrder: sortOrder)
     }
 
     func renameClient(id: Int64, name: String) throws {
-        let old = clientName(id: id)
-        let sql = "UPDATE clients SET name = ? WHERE id = ?;"
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            throw DatabaseError.exec(lastError())
-        }
-        defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_text(stmt, 1, name, -1, SQLITE_TRANSIENT)
-        sqlite3_bind_int64(stmt, 2, id)
-        if sqlite3_step(stmt) != SQLITE_DONE {
-            throw DatabaseError.exec(lastError())
-        }
-        if let old, old != name {
-            try rewriteClientName(from: old, to: name)
-        }
+        try renameListItem(table: "clients", id: id, name: name, rewriteColumn: "client")
     }
 
+    func deleteClient(id: Int64) throws {
+        try deleteListItem(table: "clients", id: id)
+    }
 
-    func projects() -> [ProjectItem] {
+    func insertProject(name: String, sortOrder: Int) throws {
+        try insertListItem(table: "projects", name: name, sortOrder: sortOrder)
+    }
+
+    func renameProject(id: Int64, name: String) throws {
+        try renameListItem(table: "projects", id: id, name: name, rewriteColumn: "project")
+    }
+
+    func deleteProject(id: Int64) throws {
+        try deleteListItem(table: "projects", id: id)
+    }
+
+    private func listItems(_ table: String) -> [NamedListItem] {
         var stmt: OpaquePointer?
-        let sql = "SELECT id, name, sort_order, archived FROM projects ORDER BY sort_order, name;"
+        let sql = "SELECT id, name, sort_order FROM \(table) ORDER BY sort_order, name;"
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
         defer { sqlite3_finalize(stmt) }
-        var items: [ProjectItem] = []
+        var items: [NamedListItem] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
             let id = sqlite3_column_int64(stmt, 0)
             let name = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
             let order = Int(sqlite3_column_int(stmt, 2))
-            let archived = sqlite3_column_int(stmt, 3) != 0
-            items.append(ProjectItem(id: id, name: name, sortOrder: order, archived: archived))
+            items.append(NamedListItem(id: id, name: name, sortOrder: order))
         }
         return items
     }
 
-    func insertProject(name: String, sortOrder: Int, archived: Bool = false) throws {
-        let sql = "INSERT INTO projects(name, sort_order, archived) VALUES(?, ?, ?);"
+    private func insertListItem(table: String, name: String, sortOrder: Int) throws {
+        let sql = "INSERT INTO \(table)(name, sort_order) VALUES(?, ?);"
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             throw DatabaseError.exec(lastError())
@@ -352,15 +283,14 @@ final class Database {
         defer { sqlite3_finalize(stmt) }
         sqlite3_bind_text(stmt, 1, name, -1, SQLITE_TRANSIENT)
         sqlite3_bind_int(stmt, 2, Int32(sortOrder))
-        sqlite3_bind_int(stmt, 3, archived ? 1 : 0)
         if sqlite3_step(stmt) != SQLITE_DONE {
             throw DatabaseError.exec(lastError())
         }
     }
 
-    func renameProject(id: Int64, name: String) throws {
-        let old = projectName(id: id)
-        let sql = "UPDATE projects SET name = ? WHERE id = ?;"
+    private func renameListItem(table: String, id: Int64, name: String, rewriteColumn: String?) throws {
+        let old = listItemName(table: table, id: id)
+        let sql = "UPDATE \(table) SET name = ? WHERE id = ?;"
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             throw DatabaseError.exec(lastError())
@@ -371,29 +301,28 @@ final class Database {
         if sqlite3_step(stmt) != SQLITE_DONE {
             throw DatabaseError.exec(lastError())
         }
-        if let old, old != name {
-            try rewriteText(table: "entries", column: "project", from: old, to: name)
-            try rewriteText(table: "running_session", column: "project", from: old, to: name)
+        if let rewriteColumn, let old, old != name {
+            try rewriteText(table: "entries", column: rewriteColumn, from: old, to: name)
+            try rewriteText(table: "running_session", column: rewriteColumn, from: old, to: name)
         }
     }
 
-    func setProjectArchived(id: Int64, archived: Bool) throws {
-        let sql = "UPDATE projects SET archived = ? WHERE id = ?;"
+    private func deleteListItem(table: String, id: Int64) throws {
+        let sql = "DELETE FROM \(table) WHERE id = ?;"
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             throw DatabaseError.exec(lastError())
         }
         defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_int(stmt, 1, archived ? 1 : 0)
-        sqlite3_bind_int64(stmt, 2, id)
+        sqlite3_bind_int64(stmt, 1, id)
         if sqlite3_step(stmt) != SQLITE_DONE {
             throw DatabaseError.exec(lastError())
         }
     }
 
-    private func projectName(id: Int64) -> String? {
+    private func listItemName(table: String, id: Int64) -> String? {
         var stmt: OpaquePointer?
-        let sql = "SELECT name FROM projects WHERE id = ?;"
+        let sql = "SELECT name FROM \(table) WHERE id = ?;"
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
         defer { sqlite3_finalize(stmt) }
         sqlite3_bind_int64(stmt, 1, id)
@@ -401,37 +330,6 @@ final class Database {
             return String(cString: cString)
         }
         return nil
-    }
-
-    func setArchived(id: Int64, archived: Bool) throws {
-        let sql = "UPDATE clients SET archived = ? WHERE id = ?;"
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            throw DatabaseError.exec(lastError())
-        }
-        defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_int(stmt, 1, archived ? 1 : 0)
-        sqlite3_bind_int64(stmt, 2, id)
-        if sqlite3_step(stmt) != SQLITE_DONE {
-            throw DatabaseError.exec(lastError())
-        }
-    }
-
-    private func clientName(id: Int64) -> String? {
-        var stmt: OpaquePointer?
-        let sql = "SELECT name FROM clients WHERE id = ?;"
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
-        defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_int64(stmt, 1, id)
-        if sqlite3_step(stmt) == SQLITE_ROW, let cString = sqlite3_column_text(stmt, 0) {
-            return String(cString: cString)
-        }
-        return nil
-    }
-
-    private func rewriteClientName(from old: String, to name: String) throws {
-        try rewriteText(table: "entries", column: "client", from: old, to: name)
-        try rewriteText(table: "running_session", column: "client", from: old, to: name)
     }
 
     private func rewriteText(table: String, column: String, from old: String, to name: String) throws {

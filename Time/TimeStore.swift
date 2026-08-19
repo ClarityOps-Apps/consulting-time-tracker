@@ -86,30 +86,6 @@ final class TimeStore: ObservableObject {
         return parts.joined(separator: " · ")
     }
 
-    var visibleClients: [ClientItem] {
-        clients.filter { !$0.archived }
-    }
-
-    var archivedClients: [ClientItem] {
-        clients.filter { $0.archived }
-    }
-
-    var archivedClientNames: Set<String> {
-        Set(archivedClients.map(\.name))
-    }
-
-    var visibleProjects: [ProjectItem] {
-        projects.filter { !$0.archived }
-    }
-
-    var archivedProjects: [ProjectItem] {
-        projects.filter { $0.archived }
-    }
-
-    var archivedProjectNames: Set<String> {
-        Set(archivedProjects.map(\.name))
-    }
-
     var todaySeconds: Int {
         let (start, end) = DateRangeKind.today.bounds(now: now)
         let finished = entries
@@ -197,159 +173,151 @@ final class TimeStore: ObservableObject {
     }
 
     func addWorkType(_ raw: String) {
-        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
-        guard !workTypes.contains(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else { return }
-        do {
-            try db.insertWorkType(name: name, sortOrder: workTypes.count)
-            reloadWorkTypes()
-        } catch {
-            NSLog("Time: could not add work type: \(error)")
-        }
+        addNamed(raw, existing: workTypes, insert: db.insertWorkType, reload: reloadWorkTypes, label: "work type")
     }
 
     func renameWorkType(_ item: WorkTypeItem, to raw: String) {
-        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
-        do {
-            try db.renameWorkType(id: item.id, name: name)
-            if workType == item.name {
-                workType = name
-            }
-            reloadWorkTypes()
-            persistFormAndRunning()
-        } catch {
-            NSLog("Time: could not rename work type: \(error)")
-        }
-    }
-
-    func addClient(_ raw: String) {
-        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
-        guard !clients.contains(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else { return }
-        do {
-            try db.insertClient(name: name, sortOrder: clients.count)
-            reloadClients()
-        } catch {
-            NSLog("Time: could not add client: \(error)")
-        }
-    }
-
-    func renameClient(_ item: ClientItem, to raw: String) {
-        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
-        do {
-            try db.renameClient(id: item.id, name: name)
-            if client == item.name {
-                client = name
-            }
-            reloadClients()
-            reloadEntries()
-            persistFormAndRunning()
-        } catch {
-            NSLog("Time: could not rename client: \(error)")
-        }
-    }
-
-    func archiveClient(_ item: ClientItem) {
-        do {
-            try db.setArchived(id: item.id, archived: true)
-            reloadClients()
-        } catch {
-            NSLog("Time: could not archive client: \(error)")
-        }
-    }
-
-    func unhideClient(_ item: ClientItem) {
-        do {
-            try db.setArchived(id: item.id, archived: false)
-            reloadClients()
-        } catch {
-            NSLog("Time: could not unhide client: \(error)")
-        }
-    }
-
-    func rememberClient(_ raw: String? = nil) {
-        let name = (raw ?? client).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
-        if clients.contains(where: { $0.name == name }) { return }
-        do {
-            try db.insertClient(name: name, sortOrder: clients.count)
-            reloadClients()
-        } catch {
-            NSLog("Time: could not remember client: \(error)")
-        }
-    }
-
-
-    func addProject(_ raw: String) {
-        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
-        guard !projects.contains(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else { return }
-        do {
-            try db.insertProject(name: name, sortOrder: projects.count)
-            reloadProjects()
-        } catch {
-            NSLog("Time: could not add project: \(error)")
-        }
-    }
-
-    func renameProject(_ item: ProjectItem, to raw: String) {
-        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
-        do {
-            try db.renameProject(id: item.id, name: name)
-            if project == item.name {
-                project = name
-            }
-            reloadProjects()
-            reloadEntries()
-            persistFormAndRunning()
-        } catch {
-            NSLog("Time: could not rename project: \(error)")
-        }
-    }
-
-    func archiveProject(_ item: ProjectItem) {
-        do {
-            try db.setProjectArchived(id: item.id, archived: true)
-            reloadProjects()
-        } catch {
-            NSLog("Time: could not archive project: \(error)")
-        }
-    }
-
-    func unhideProject(_ item: ProjectItem) {
-        do {
-            try db.setProjectArchived(id: item.id, archived: false)
-            reloadProjects()
-        } catch {
-            NSLog("Time: could not unhide project: \(error)")
-        }
-    }
-
-    func rememberProject(_ raw: String? = nil) {
-        let name = (raw ?? project).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
-        if projects.contains(where: { $0.name == name }) { return }
-        do {
-            try db.insertProject(name: name, sortOrder: projects.count)
-            reloadProjects()
-        } catch {
-            NSLog("Time: could not remember project: \(error)")
-        }
+        renameNamed(item, to: raw, rename: db.renameWorkType, applyCurrent: { name in
+            if self.workType == item.name { self.workType = name }
+        }, reload: reloadWorkTypes, label: "work type")
     }
 
     func removeWorkType(_ item: WorkTypeItem) {
+        removeNamed(item, delete: db.deleteWorkType, clearCurrent: {
+            if self.workType == item.name { self.workType = "" }
+        }, reload: reloadWorkTypes, label: "work type")
+    }
+
+    func addClient(_ raw: String) {
+        addNamed(raw, existing: clients, insert: db.insertClient, reload: reloadClients, label: "client")
+    }
+
+    func renameClient(_ item: ClientItem, to raw: String) {
+        renameNamed(item, to: raw, rename: db.renameClient, applyCurrent: { name in
+            if self.client == item.name { self.client = name }
+        }, reload: {
+            self.reloadClients()
+            self.reloadEntries()
+        }, label: "client")
+    }
+
+    func removeClient(_ item: ClientItem) {
+        removeNamed(item, delete: db.deleteClient, clearCurrent: {
+            if self.client == item.name { self.client = "" }
+        }, reload: reloadClients, label: "client")
+    }
+
+    func rememberClient(_ raw: String? = nil) {
+        addClient(raw ?? client)
+    }
+
+    func addProject(_ raw: String) {
+        addNamed(raw, existing: projects, insert: db.insertProject, reload: reloadProjects, label: "project")
+    }
+
+    func renameProject(_ item: ProjectItem, to raw: String) {
+        renameNamed(item, to: raw, rename: db.renameProject, applyCurrent: { name in
+            if self.project == item.name { self.project = name }
+        }, reload: {
+            self.reloadProjects()
+            self.reloadEntries()
+        }, label: "project")
+    }
+
+    func removeProject(_ item: ProjectItem) {
+        removeNamed(item, delete: db.deleteProject, clearCurrent: {
+            if self.project == item.name { self.project = "" }
+        }, reload: reloadProjects, label: "project")
+    }
+
+    func rememberProject(_ raw: String? = nil) {
+        addProject(raw ?? project)
+    }
+
+    private func addNamed(
+        _ raw: String,
+        existing: [NamedListItem],
+        insert: (String, Int) throws -> Void,
+        reload: () -> Void,
+        label: String
+    ) {
+        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        guard !existing.contains(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else { return }
         do {
-            try db.deleteWorkType(id: item.id)
-            if workType == item.name {
-                workType = ""
-            }
-            reloadWorkTypes()
+            try insert(name, existing.count)
+            reload()
+        } catch {
+            NSLog("Time: could not add \(label): \(error)")
+        }
+    }
+
+    private func renameNamed(
+        _ item: NamedListItem,
+        to raw: String,
+        rename: (Int64, String) throws -> Void,
+        applyCurrent: (String) -> Void,
+        reload: () -> Void,
+        label: String
+    ) {
+        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        do {
+            try rename(item.id, name)
+            applyCurrent(name)
+            reload()
             persistFormAndRunning()
         } catch {
-            NSLog("Time: could not remove work type: \(error)")
+            NSLog("Time: could not rename \(label): \(error)")
+        }
+    }
+
+    private func removeNamed(
+        _ item: NamedListItem,
+        delete: (Int64) throws -> Void,
+        clearCurrent: () -> Void,
+        reload: () -> Void,
+        label: String
+    ) {
+        do {
+            try delete(item.id)
+            clearCurrent()
+            reload()
+            persistFormAndRunning()
+        } catch {
+            NSLog("Time: could not remove \(label): \(error)")
+        }
+    }
+
+    func items(for kind: NamedListKind) -> [NamedListItem] {
+        switch kind {
+        case .workType: return workTypes
+        case .client: return clients
+        case .project: return projects
+        }
+    }
+
+    func addItem(_ raw: String, kind: NamedListKind) {
+        switch kind {
+        case .workType: addWorkType(raw)
+        case .client: addClient(raw)
+        case .project: addProject(raw)
+        }
+    }
+
+    func renameItem(_ item: NamedListItem, to raw: String, kind: NamedListKind) {
+        switch kind {
+        case .workType: renameWorkType(item, to: raw)
+        case .client: renameClient(item, to: raw)
+        case .project: renameProject(item, to: raw)
+        }
+    }
+
+    func removeItem(_ item: NamedListItem, kind: NamedListKind) {
+        switch kind {
+        case .workType: removeWorkType(item)
+        case .client: removeClient(item)
+        case .project: removeProject(item)
         }
     }
 
@@ -516,13 +484,6 @@ final class TimeStore: ObservableObject {
     }
 
     func filteredEntries() -> [TimeEntry] {
-        let hiddenClients = archivedClientNames
-        let hiddenProjects = archivedProjectNames
-        return entries(in: dateRange, customStart: customStart, customEnd: customEnd)
-            .filter { entry in
-                if !entry.client.isEmpty && hiddenClients.contains(entry.client) { return false }
-                if !entry.project.isEmpty && hiddenProjects.contains(entry.project) { return false }
-                return true
-            }
+        entries(in: dateRange, customStart: customStart, customEnd: customEnd)
     }
 }

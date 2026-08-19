@@ -255,7 +255,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             clientsWindow = makeWindow(
                 title: "Edit list…",
                 size: NSSize(width: 320, height: 420),
-                root: ClientEditor(store: store) { [weak self] in
+                root: WorkTypeEditor(store: store, kind: .client) { [weak self] in
                     self?.closeClients()
                 }
             )
@@ -273,7 +273,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             projectsWindow = makeWindow(
                 title: "Edit list…",
                 size: NSSize(width: 320, height: 420),
-                root: ProjectEditor(store: store) { [weak self] in
+                root: WorkTypeEditor(store: store, kind: .project) { [weak self] in
                     self?.closeProjects()
                 }
             )
@@ -344,7 +344,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     @objc func popClientMenu() {
         store.rememberClient()
         let menu = NSMenu()
-        for item in store.visibleClients {
+        for item in store.clients {
             let row = NSMenuItem(title: item.name, action: #selector(pickClient(_:)), keyEquivalent: "")
             row.target = self
             row.representedObject = item.name
@@ -374,7 +374,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     @objc func popProjectMenu() {
         store.rememberProject()
         let menu = NSMenu()
-        for item in store.visibleProjects {
+        for item in store.projects {
             let row = NSMenuItem(title: item.name, action: #selector(pickProject(_:)), keyEquivalent: "")
             row.target = self
             row.representedObject = item.name
