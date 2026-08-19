@@ -163,7 +163,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     @objc func toggleTimeWindow() {
-        if let window = timeWindow, window.isVisible {
+        if let window = timeWindow, window.isVisible, window.isOnActiveSpace {
             window.orderOut(nil)
             retreatIfNoWindows()
         } else {
@@ -298,9 +298,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         window.level = .floating
         window.hidesOnDeactivate = false
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .moveToActiveSpace]
-        if !window.isVisible || NSScreen.screens.allSatisfy({ !$0.visibleFrame.intersects(window.frame) }) {
+        if let screen = NSScreen.main, !screen.visibleFrame.intersects(window.frame) {
             window.center()
         }
+        window.orderFrontRegardless()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
