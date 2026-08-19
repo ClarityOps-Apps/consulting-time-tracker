@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var editorWindow: NSWindow?
     private var colorsWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
+    private var revealInFlight = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSAppleEventManager.shared().setEventHandler(
@@ -70,15 +71,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
+        if revealInFlight { return }
         let anyVisible = [timeWindow, historyWindow, reportWindow].compactMap { $0 }.contains { $0.isVisible }
         if !anyVisible { revealTime() }
     }
 
     private func revealTime() {
+        if revealInFlight { return }
+        revealInFlight = true
         NSApp.setActivationPolicy(.regular)
         DispatchQueue.main.async { [weak self] in
             self?.showTimeWindow()
             NSApp.activate(ignoringOtherApps: true)
+            self?.revealInFlight = false
         }
     }
 
@@ -310,7 +315,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         NSApp.setActivationPolicy(.regular)
         window.level = .floating
         window.hidesOnDeactivate = false
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .moveToActiveSpace]
+        window.collectionBehavior = [.canJoinAllSpaces, .moveToActiveSpace]
         placeBelowStatusItem(window)
         window.alphaValue = 1
         window.orderFrontRegardless()
@@ -364,7 +369,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         window.isReleasedWhenClosed = false
         window.level = .floating
         window.hidesOnDeactivate = false
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .moveToActiveSpace]
+        window.collectionBehavior = [.canJoinAllSpaces, .moveToActiveSpace]
         window.delegate = self
         window.standardWindowButton(.closeButton)?.isEnabled = true
         window.standardWindowButton(.closeButton)?.isHidden = false
