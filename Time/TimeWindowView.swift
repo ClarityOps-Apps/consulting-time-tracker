@@ -15,11 +15,11 @@ struct TimeWindowView: View {
                 .font(.system(size: 34, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(store.isRunning ? palette.font : palette.quiet)
-                .scaleEffect(store.isRunning && clockPulse ? 1.035 : 1)
-                .opacity(store.isRunning && clockPulse ? 0.78 : 1)
+                .scaleEffect(store.isRunning && clockPulse ? 1.07 : 1)
+                .opacity(store.isRunning && clockPulse ? 0.58 : 1)
                 .animation(
                     store.isRunning
-                        ? .easeInOut(duration: 1.0).repeatForever(autoreverses: true)
+                        ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true)
                         : .easeOut(duration: 0.35),
                     value: clockPulse
                 )
