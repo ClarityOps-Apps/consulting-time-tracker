@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TimeWindowView: View {
     @ObservedObject var store: TimeStore
+    @State private var clockDim = false
     private var palette: Palette { store.palette }
 
     var body: some View {
@@ -14,8 +15,19 @@ struct TimeWindowView: View {
                 .font(.system(size: 34, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(store.isRunning ? palette.font : palette.quiet)
+                .opacity(store.isRunning && clockDim ? 0.72 : 1)
+                .animation(
+                    store.isRunning
+                        ? .easeInOut(duration: 1.5).repeatForever(autoreverses: true)
+                        : .linear(duration: 0.2),
+                    value: clockDim
+                )
                 .frame(maxWidth: .infinity)
                 .padding(.top, 14)
+                .onAppear { kickClock(store.isRunning) }
+                .onChange(of: store.isRunning) { _, running in
+                    kickClock(running)
+                }
 
             Text(store.isRunning ? store.runningSubtitle : " ")
                 .font(.system(size: 12))
@@ -67,6 +79,15 @@ struct TimeWindowView: View {
         .frame(width: 280)
         .background(palette.window)
         .tint(palette.action)
+    }
+
+
+    private func kickClock(_ running: Bool) {
+        clockDim = false
+        guard running else { return }
+        DispatchQueue.main.async {
+            clockDim = true
+        }
     }
 
     private func fieldRow<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
