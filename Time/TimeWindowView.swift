@@ -117,13 +117,13 @@ struct TimeWindowView: View {
                 LinearGradient(
                     stops: [
                         .init(color: Color.white, location: 0),
-                        .init(color: palette.minutes, location: 0.22),
-                        .init(color: palette.minutes, location: 0.40),
-                        .init(color: palette.font, location: 0.68),
+                        .init(color: palette.minutes, location: 0.08),
+                        .init(color: palette.minutes, location: 0.38),
+                        .init(color: palette.font, location: 0.55),
                         .init(color: palette.font, location: 1)
                     ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+                    startPoint: .leading,
+                    endPoint: .trailing
                 )
             )
         }
@@ -150,30 +150,38 @@ struct TimeWindowView: View {
     }
 
     private var workTypeControl: some View {
-        Menu {
-            ForEach(store.workTypes) { item in
-                Button(item.name) {
-                    store.workType = item.name
-                }
-            }
-            Divider()
-            Button("Edit list…") {
-                store.openWorkTypes()
-            }
-        } label: {
-            Text(store.workType.isEmpty ? "Choose…" : store.workType)
-                .foregroundStyle(store.workType.isEmpty ? palette.quiet : palette.font)
-                .lineLimit(1)
-                .modifier(QuietField(palette: palette))
-                .overlay(alignment: .trailing) {
-                    Image(systemName: "arrowtriangle.down.fill")
-                        .font(.system(size: 6, weight: .bold))
-                        .foregroundStyle(palette.font)
-                        .padding(.trailing, 8)
-                }
+        TextField("", text: Binding(
+            get: { store.workType.isEmpty ? "Choose…" : store.workType },
+            set: { _ in }
+        ))
+        .textFieldStyle(.plain)
+        .modifier(QuietField(palette: palette))
+        .overlay(alignment: .trailing) {
+            Image(systemName: "arrowtriangle.down.fill")
+                .font(.system(size: 6, weight: .bold))
+                .foregroundStyle(palette.font)
+                .padding(.trailing, 8)
+                .allowsHitTesting(false)
         }
-        .buttonStyle(.plain)
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .overlay {
+            Menu {
+                ForEach(store.workTypes) { item in
+                    Button(item.name) {
+                        store.workType = item.name
+                    }
+                }
+                Divider()
+                Button("Edit list…") {
+                    store.openWorkTypes()
+                }
+            } label: {
+                Color.clear
+                    .frame(width: 148, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+        }
     }
 }
