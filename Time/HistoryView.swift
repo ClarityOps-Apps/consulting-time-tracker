@@ -10,13 +10,25 @@ struct DateRangeBar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center) {
-                Picker("", selection: $store.dateRange) {
-                    ForEach(DateRangeKind.allCases) { item in
-                        Text(item.rawValue).tag(item)
+                ZStack(alignment: .leading) {
+                    HStack {
+                        Text(store.dateRange.rawValue)
+                            .foregroundStyle(palette.font)
+                            .lineLimit(1)
+                        Spacer(minLength: 4)
+                        Image(systemName: "arrowtriangle.down.fill")
+                            .font(.system(size: 6, weight: .bold))
+                            .foregroundStyle(palette.font)
                     }
+                    .modifier(QuietField(palette: palette))
+                    Picker("", selection: $store.dateRange) {
+                        ForEach(DateRangeKind.allCases) { item in
+                            Text(item.rawValue).tag(item)
+                        }
+                    }
+                    .labelsHidden()
+                    .opacity(0.02)
                 }
-                .labelsHidden()
-                .frame(maxWidth: 180, alignment: .leading)
                 Spacer()
                 if showSave {
                     Button("Save CSV") { onSave?() }
@@ -120,10 +132,7 @@ struct HistoryView: View {
             } label: {
                 HStack {
                     HStack(spacing: 6) {
-                        Text(byClientOpen ? "▾" : "▸")
-                            .font(.system(size: 9))
-                            .foregroundStyle(palette.quiet)
-                            .frame(width: 12)
+                        DisclosureCaret(open: byClientOpen, color: palette.font)
                         Text("By client")
                     }
                     Spacer()

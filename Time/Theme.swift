@@ -206,3 +206,17 @@ func statusClockImage() -> NSImage {
     image.isTemplate = true
     return image
 }
+
+
+struct DisclosureCaret: View {
+    var open: Bool
+    var color: Color
+
+    var body: some View {
+        Image(systemName: "arrowtriangle.down.fill")
+            .font(.system(size: 6, weight: .bold))
+            .foregroundStyle(color)
+            .rotationEffect(.degrees(open ? 0 : -90))
+            .frame(width: 12)
+    }
+}

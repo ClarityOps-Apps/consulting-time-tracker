@@ -141,10 +141,7 @@ struct ReportView: View {
     }
 
     private func caret(_ open: Bool) -> some View {
-        Text(open ? "▾" : "▸")
-            .font(.system(size: 9))
-            .foregroundStyle(palette.quiet)
-            .frame(width: 12)
+        DisclosureCaret(open: open, color: palette.font)
     }
 
     private func projectKey(client: String, project: String) -> String {
