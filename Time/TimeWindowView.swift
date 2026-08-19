@@ -3,8 +3,6 @@ import SwiftUI
 struct TimeWindowView: View {
     @ObservedObject var store: TimeStore
     @State private var clockPulse = false
-    @FocusState private var clientFocused: Bool
-    @FocusState private var projectFocused: Bool
     private var palette: Palette { store.palette }
 
     var body: some View {
@@ -133,41 +131,33 @@ struct TimeWindowView: View {
         .frame(minHeight: 32)
     }
 
-
-    private var projectControl: some View {
-        HStack(spacing: 4) {
-            TextField("", text: $store.project)
-                .textFieldStyle(.plain)
-                .focused($projectFocused)
-                .onSubmit { store.rememberProject() }
-                .onChange(of: projectFocused) { _, focused in
-                    if !focused { store.rememberProject() }
-                }
-            Button {
-                store.openProjectMenu()
-            } label: {
-                Image(systemName: "arrowtriangle.down.fill")
-                    .font(.system(size: 6, weight: .bold))
-                    .foregroundStyle(palette.font)
-                    .frame(width: 12, height: 16)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-        }
-        .modifier(QuietField(palette: palette))
+    private var clientControl: some View {
+        typedListControl(
+            text: $store.client,
+            onSubmit: { store.rememberClient() },
+            onMenu: { store.openClientMenu() }
+        )
     }
 
-    private var clientControl: some View {
+    private var projectControl: some View {
+        typedListControl(
+            text: $store.project,
+            onSubmit: { store.rememberProject() },
+            onMenu: { store.openProjectMenu() }
+        )
+    }
+
+    private func typedListControl(
+        text: Binding<String>,
+        onSubmit: @escaping () -> Void,
+        onMenu: @escaping () -> Void
+    ) -> some View {
         HStack(spacing: 4) {
-            TextField("", text: $store.client)
+            TextField("", text: text)
                 .textFieldStyle(.plain)
-                .focused($clientFocused)
-                .onSubmit { store.rememberClient() }
-                .onChange(of: clientFocused) { _, focused in
-                    if !focused { store.rememberClient() }
-                }
+                .onSubmit(onSubmit)
             Button {
-                store.openClientMenu()
+                onMenu()
             } label: {
                 Image(systemName: "arrowtriangle.down.fill")
                     .font(.system(size: 6, weight: .bold))
