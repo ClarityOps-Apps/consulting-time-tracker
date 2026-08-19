@@ -3,6 +3,7 @@ import SwiftUI
 struct TimeWindowView: View {
     @ObservedObject var store: TimeStore
     @State private var clockPulse = false
+    @FocusState private var clientFocused: Bool
     private var palette: Palette { store.palette }
 
     var body: some View {
@@ -42,11 +43,7 @@ struct TimeWindowView: View {
 
             VStack(spacing: 0) {
                 fieldRow("Work type") { workTypeControl }
-                fieldRow("Client") {
-                    TextField("", text: $store.client)
-                        .textFieldStyle(.plain)
-                        .modifier(QuietField(palette: palette))
-                }
+                fieldRow("Client") { clientControl }
                 fieldRow("Project") {
                     TextField("", text: $store.project)
                         .textFieldStyle(.plain)
@@ -137,6 +134,29 @@ struct TimeWindowView: View {
             content()
         }
         .frame(minHeight: 32)
+    }
+
+    private var clientControl: some View {
+        HStack(spacing: 4) {
+            TextField("", text: $store.client)
+                .textFieldStyle(.plain)
+                .focused($clientFocused)
+                .onSubmit { store.rememberClient() }
+                .onChange(of: clientFocused) { _, focused in
+                    if !focused { store.rememberClient() }
+                }
+            Button {
+                store.openClientMenu()
+            } label: {
+                Image(systemName: "arrowtriangle.down.fill")
+                    .font(.system(size: 6, weight: .bold))
+                    .foregroundStyle(palette.font)
+                    .frame(width: 12, height: 16)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .modifier(QuietField(palette: palette))
     }
 
     private var workTypeControl: some View {

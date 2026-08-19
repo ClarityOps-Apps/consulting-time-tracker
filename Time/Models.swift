@@ -25,6 +25,27 @@ struct WorkTypeItem: Identifiable, Hashable {
     var sortOrder: Int
 }
 
+struct ClientItem: Identifiable, Hashable {
+    var id: Int64
+    var name: String
+    var sortOrder: Int
+    var archived: Bool
+}
+
+struct ProjectItem: Identifiable, Hashable {
+    var id: Int64
+    var name: String
+    var sortOrder: Int
+    var archived: Bool
+}
+
+struct ProjectItem: Identifiable, Hashable {
+    var id: Int64
+    var name: String
+    var sortOrder: Int
+    var archived: Bool
+}
+
 enum DateRangeKind: String, CaseIterable, Identifiable {
     case today = "Today"
     case thisWeek = "This week"

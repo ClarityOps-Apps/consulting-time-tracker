@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var historyWindow: NSWindow?
     private var reportWindow: NSWindow?
     private var editorWindow: NSWindow?
+    private var clientsWindow: NSWindow?
     private var colorsWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
     private var revealInFlight = false
@@ -37,6 +38,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
         store.onOpenWorkTypeMenu = { [weak self] in
             self?.popWorkTypeMenu()
+        }
+        store.onOpenClientMenu = { [weak self] in
+            self?.popClientMenu()
+        }
+        store.onOpenClients = { [weak self] in
+            self?.showClients()
         }
         store.onOpenDateRangeMenu = { [weak self] in
             self?.popDateRangeMenu()
@@ -141,6 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         historyWindow?.backgroundColor = color
         reportWindow?.backgroundColor = color
         editorWindow?.backgroundColor = color
+        clientsWindow?.backgroundColor = color
         colorsWindow?.backgroundColor = color
     }
 
@@ -234,6 +242,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         retreatIfNoWindows()
     }
 
+    @objc func showClients() {
+        if clientsWindow == nil {
+            clientsWindow = makeWindow(
+                title: "Edit list…",
+                size: NSSize(width: 320, height: 420),
+                root: ClientEditor(store: store) { [weak self] in
+                    self?.closeClients()
+                }
+            )
+        }
+        present(clientsWindow)
+    }
+
+    func closeClients() {
+        clientsWindow?.orderOut(nil)
+        retreatIfNoWindows()
+    }
+
     @objc func popWorkTypeMenu() {
         let menu = NSMenu()
         for item in store.workTypes {
@@ -287,6 +313,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     @objc func pickWorkType(_ sender: NSMenuItem) {
         guard let name = sender.representedObject as? String else { return }
         store.workType = name
+    }
+
+    @objc func popClientMenu() {
+        store.rememberClient()
+        let menu = NSMenu()
+        for item in store.visibleClients {
+            let row = NSMenuItem(title: item.name, action: #selector(pickClient(_:)), keyEquivalent: "")
+            row.target = self
+            row.representedObject = item.name
+            if item.name == store.client {
+                row.state = .on
+            }
+            menu.addItem(row)
+        }
+        menu.addItem(.separator())
+        let edit = NSMenuItem(title: "Edit list…", action: #selector(showClients), keyEquivalent: "")
+        edit.target = self
+        menu.addItem(edit)
+        if let event = NSApp.currentEvent, let view = timeWindow?.contentView {
+            NSMenu.popUpContextMenu(menu, with: event, for: view)
+        } else if let view = timeWindow?.contentView {
+            let point = NSPoint(x: view.bounds.maxX - 40, y: view.bounds.midY)
+            menu.popUp(positioning: nil, at: point, in: view)
+        }
+    }
+
+    @objc func pickClient(_ sender: NSMenuItem) {
+        guard let name = sender.representedObject as? String else { return }
+        store.client = name
+        store.rememberClient()
     }
 
     @objc func showColors() {
@@ -343,7 +399,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     private func retreatIfNoWindows() {
-        let anyVisible = [timeWindow, historyWindow, reportWindow, editorWindow, colorsWindow]
+        let anyVisible = [timeWindow, historyWindow, reportWindow, editorWindow, clientsWindow, colorsWindow]
             .compactMap { $0 }
             .contains { $0.isVisible }
         if !anyVisible {

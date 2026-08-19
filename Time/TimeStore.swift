@@ -13,6 +13,8 @@ final class TimeStore: ObservableObject {
     @Published var project = ""
     @Published var billable = false
     @Published var workTypes: [WorkTypeItem] = []
+    @Published var clients: [ClientItem] = []
+    @Published var projects: [ProjectItem] = []
     @Published var entries: [TimeEntry] = []
     @Published var now = Date()
     @Published var palette = Palette()
@@ -25,6 +27,10 @@ final class TimeStore: ObservableObject {
     var onOpenHistory: (() -> Void)?
     var onOpenReport: (() -> Void)?
     var onOpenWorkTypeMenu: (() -> Void)?
+    var onOpenClientMenu: (() -> Void)?
+    var onOpenClients: (() -> Void)?
+    var onOpenProjectMenu: (() -> Void)?
+    var onOpenProjects: (() -> Void)?
     var onOpenDateRangeMenu: (() -> Void)?
 
     private let db: Database
@@ -80,6 +86,30 @@ final class TimeStore: ObservableObject {
         return parts.joined(separator: " · ")
     }
 
+    var visibleClients: [ClientItem] {
+        clients.filter { !$0.archived }
+    }
+
+    var archivedClients: [ClientItem] {
+        clients.filter { $0.archived }
+    }
+
+    var archivedClientNames: Set<String> {
+        Set(archivedClients.map(\.name))
+    }
+
+    var visibleProjects: [ProjectItem] {
+        projects.filter { !$0.archived }
+    }
+
+    var archivedProjects: [ProjectItem] {
+        projects.filter { $0.archived }
+    }
+
+    var archivedProjectNames: Set<String> {
+        Set(archivedProjects.map(\.name))
+    }
+
     var todaySeconds: Int {
         let (start, end) = DateRangeKind.today.bounds(now: now)
         let finished = entries
@@ -111,6 +141,7 @@ final class TimeStore: ObservableObject {
         runningStartedAt = now
         isRunning = true
         isPaused = false
+        rememberClient()
         persistFormAndRunning()
         persistHeld()
         objectWillChange.send()
@@ -152,6 +183,7 @@ final class TimeStore: ObservableObject {
         } catch {
             NSLog("Time: could not save entry: \(error)")
         }
+        rememberClient()
         isRunning = false
         isPaused = false
         runningStartedAt = nil
@@ -189,6 +221,64 @@ final class TimeStore: ObservableObject {
         }
     }
 
+    func addClient(_ raw: String) {
+        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        guard !clients.contains(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else { return }
+        do {
+            try db.insertClient(name: name, sortOrder: clients.count)
+            reloadClients()
+        } catch {
+            NSLog("Time: could not add client: \(error)")
+        }
+    }
+
+    func renameClient(_ item: ClientItem, to raw: String) {
+        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        do {
+            try db.renameClient(id: item.id, name: name)
+            if client == item.name {
+                client = name
+            }
+            reloadClients()
+            reloadEntries()
+            persistFormAndRunning()
+        } catch {
+            NSLog("Time: could not rename client: \(error)")
+        }
+    }
+
+    func archiveClient(_ item: ClientItem) {
+        do {
+            try db.setArchived(id: item.id, archived: true)
+            reloadClients()
+        } catch {
+            NSLog("Time: could not archive client: \(error)")
+        }
+    }
+
+    func unhideClient(_ item: ClientItem) {
+        do {
+            try db.setArchived(id: item.id, archived: false)
+            reloadClients()
+        } catch {
+            NSLog("Time: could not unhide client: \(error)")
+        }
+    }
+
+    func rememberClient(_ raw: String? = nil) {
+        let name = (raw ?? client).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        if clients.contains(where: { $0.name == name }) { return }
+        do {
+            try db.insertClient(name: name, sortOrder: clients.count)
+            reloadClients()
+        } catch {
+            NSLog("Time: could not remember client: \(error)")
+        }
+    }
+
     func removeWorkType(_ item: WorkTypeItem) {
         do {
             try db.deleteWorkType(id: item.id)
@@ -209,6 +299,7 @@ final class TimeStore: ObservableObject {
 
     private func reload() {
         reloadWorkTypes()
+        reloadClients()
         reloadEntries()
         loadPalette()
         workType = db.setting("work_type") ?? ""
@@ -219,6 +310,10 @@ final class TimeStore: ObservableObject {
 
     private func reloadWorkTypes() {
         workTypes = db.workTypes()
+    }
+
+    private func reloadClients() {
+        clients = db.clients()
     }
 
     private func reloadEntries() {
@@ -306,6 +401,15 @@ final class TimeStore: ObservableObject {
         onOpenWorkTypeMenu?()
     }
 
+    func openClientMenu() {
+        rememberClient()
+        onOpenClientMenu?()
+    }
+
+    func openClients() {
+        onOpenClients?()
+    }
+
     func openDateRangeMenu() {
         onOpenDateRangeMenu?()
     }
@@ -337,6 +441,11 @@ final class TimeStore: ObservableObject {
     }
 
     func filteredEntries() -> [TimeEntry] {
-        entries(in: dateRange, customStart: customStart, customEnd: customEnd)
+        let hidden = archivedClientNames
+        return entries(in: dateRange, customStart: customStart, customEnd: customEnd)
+            .filter { entry in
+                if entry.client.isEmpty { return true }
+                return !hidden.contains(entry.client)
+            }
     }
 }
