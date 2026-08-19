@@ -4,14 +4,19 @@ struct DateRangeBar: View {
     @ObservedObject var store: TimeStore
     var showSave = false
     var onSave: (() -> Void)? = nil
-    @State private var menuOpen = false
 
     private var palette: Palette { store.palette }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center) {
-                rangeButton
+                Picker("", selection: $store.dateRange) {
+                    ForEach(DateRangeKind.allCases) { item in
+                        Text(item.rawValue).tag(item)
+                    }
+                }
+                .labelsHidden()
+                .frame(maxWidth: 180, alignment: .leading)
                 Spacer()
                 if showSave {
                     Button("Save CSV") { onSave?() }
@@ -30,71 +35,6 @@ struct DateRangeBar: View {
                 }
             }
         }
-        .zIndex(8)
-    }
-
-    private var rangeButton: some View {
-        Button {
-            menuOpen.toggle()
-        } label: {
-            HStack(spacing: 8) {
-                Text(store.dateRange.rawValue)
-                    .foregroundStyle(palette.font)
-                Text("▾")
-                    .font(.system(size: 9))
-                    .foregroundStyle(palette.quiet)
-            }
-            .font(.system(size: 13))
-            .padding(.horizontal, 8)
-            .frame(height: 26)
-            .background(palette.wash)
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(palette.line, lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .overlay(alignment: .topLeading) {
-            if menuOpen {
-                rangeMenu
-                    .offset(y: 30)
-            }
-        }
-    }
-
-    private var rangeMenu: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(DateRangeKind.allCases) { item in
-                if item == .chooseDates {
-                    palette.line
-                        .frame(height: 1)
-                        .padding(.vertical, 4)
-                }
-                Button {
-                    store.dateRange = item
-                    menuOpen = false
-                } label: {
-                    Text(item.rawValue)
-                        .font(.system(size: 13, weight: store.dateRange == item ? .bold : .regular))
-                        .foregroundStyle(store.dateRange == item ? palette.action : palette.font)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(store.dateRange == item ? palette.actionWash : Color.clear)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .frame(width: 160)
-        .padding(.vertical, 4)
-        .background(palette.window)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(palette.line, lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.12), radius: 12, y: 6)
     }
 }
 
