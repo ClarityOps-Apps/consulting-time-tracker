@@ -121,6 +121,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         } else {
             addItem(menu, title: "Start", action: #selector(startTimer))
         }
+        if !store.otherSessions.isEmpty {
+            menu.addItem(.separator())
+            for session in store.otherSessions {
+                let row = NSMenuItem(title: session.rowLabel, action: #selector(resumeParked(_:)), keyEquivalent: "")
+                row.target = self
+                row.representedObject = session.id
+                menu.addItem(row)
+            }
+        }
         menu.addItem(.separator())
         addItem(menu, title: "Show window", action: #selector(showTimeWindow))
         addItem(menu, title: "History", action: #selector(showHistory))
@@ -158,6 +167,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         clientsWindow?.backgroundColor = color
         projectsWindow?.backgroundColor = color
         colorsWindow?.backgroundColor = color
+    }
+
+    @objc func resumeParked(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? Int64,
+              let session = store.otherSessions.first(where: { $0.id == id }) else { return }
+        store.resumeParked(session)
+        showTimeWindow()
     }
 
     @objc func startTimer() {

@@ -19,6 +19,35 @@ struct TimeEntry: Identifiable, Hashable {
     }
 }
 
+struct ParkedSession: Identifiable, Hashable {
+    var id: Int64
+    var heldSeconds: Int
+    var sessionStartedAt: Date
+    var client: String
+    var project: String
+    var workType: String
+    var billable: Bool
+
+    var identityKey: String {
+        Self.identityKey(client: client, project: project, workType: workType)
+    }
+
+    static func identityKey(client: String, project: String, workType: String) -> String {
+        let c = client.trimmingCharacters(in: .whitespacesAndNewlines)
+        let p = project.trimmingCharacters(in: .whitespacesAndNewlines)
+        let w = workType.trimmingCharacters(in: .whitespacesAndNewlines)
+        return [c, p, w].joined(separator: "\u{1e}")
+    }
+
+    var rowLabel: String {
+        var parts = [client, project, workType]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        parts.append(DurationFormat.menuBar(heldSeconds))
+        return parts.joined(separator: " · ")
+    }
+}
+
 struct NamedListItem: Identifiable, Hashable {
     var id: Int64
     var name: String

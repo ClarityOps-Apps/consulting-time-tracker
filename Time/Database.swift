@@ -89,6 +89,17 @@ final class Database {
             """)
         try ensureNameListTable("clients")
         try ensureNameListTable("projects")
+        try exec("""
+            CREATE TABLE IF NOT EXISTS parked_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                held_seconds INTEGER NOT NULL DEFAULT 0,
+                session_started_at INTEGER NOT NULL,
+                client TEXT NOT NULL DEFAULT '',
+                project TEXT NOT NULL DEFAULT '',
+                work_type TEXT NOT NULL DEFAULT '',
+                billable INTEGER NOT NULL DEFAULT 0
+            );
+            """)
         try seedWorkTypesIfNeeded()
         try seedNameListIfNeeded(table: "clients", column: "client")
         try seedNameListIfNeeded(table: "projects", column: "project")
@@ -148,6 +159,7 @@ final class Database {
         let queries = [
             "SELECT DISTINCT TRIM(\(column)) FROM entries WHERE TRIM(\(column)) != '';",
             "SELECT TRIM(\(column)) FROM running_session WHERE id = 1 AND TRIM(\(column)) != '';",
+            "SELECT DISTINCT TRIM(\(column)) FROM parked_sessions WHERE TRIM(\(column)) != '';",
         ]
         for sql in queries {
             for raw in stringColumn(sql) {
@@ -321,6 +333,7 @@ final class Database {
         if let rewriteColumn, let old, old != name {
             try rewriteText(table: "entries", column: rewriteColumn, from: old, to: name)
             try rewriteText(table: "running_session", column: rewriteColumn, from: old, to: name)
+            try rewriteText(table: "parked_sessions", column: rewriteColumn, from: old, to: name)
         }
     }
 
@@ -477,5 +490,105 @@ final class Database {
 
     func clearRunningSession() throws {
         try exec("DELETE FROM running_session;")
+    }
+
+    func parkedSessions() -> [ParkedSession] {
+        var stmt: OpaquePointer?
+        let sql = """
+            SELECT id, held_seconds, session_started_at, client, project, work_type, billable
+            FROM parked_sessions
+            ORDER BY id ASC;
+            """
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        var items: [ParkedSession] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            items.append(
+                ParkedSession(
+                    id: sqlite3_column_int64(stmt, 0),
+                    heldSeconds: Int(sqlite3_column_int(stmt, 1)),
+                    sessionStartedAt: Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(stmt, 2))),
+                    client: sqlite3_column_text(stmt, 3).map { String(cString: $0) } ?? "",
+                    project: sqlite3_column_text(stmt, 4).map { String(cString: $0) } ?? "",
+                    workType: sqlite3_column_text(stmt, 5).map { String(cString: $0) } ?? "",
+                    billable: sqlite3_column_int(stmt, 6) != 0
+                )
+            )
+        }
+        return items
+    }
+
+    @discardableResult
+    func insertParkedSession(
+        heldSeconds: Int,
+        sessionStartedAt: Date,
+        client: String,
+        project: String,
+        workType: String,
+        billable: Bool
+    ) throws -> Int64 {
+        let sql = """
+            INSERT INTO parked_sessions(held_seconds, session_started_at, client, project, work_type, billable)
+            VALUES(?, ?, ?, ?, ?, ?);
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.exec(lastError())
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int(stmt, 1, Int32(heldSeconds))
+        sqlite3_bind_int64(stmt, 2, Int64(sessionStartedAt.timeIntervalSince1970))
+        sqlite3_bind_text(stmt, 3, client, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 4, project, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 5, workType, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_int(stmt, 6, billable ? 1 : 0)
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            throw DatabaseError.exec(lastError())
+        }
+        return sqlite3_last_insert_rowid(db)
+    }
+
+    func updateParkedSession(
+        id: Int64,
+        heldSeconds: Int,
+        sessionStartedAt: Date,
+        client: String,
+        project: String,
+        workType: String,
+        billable: Bool
+    ) throws {
+        let sql = """
+            UPDATE parked_sessions
+            SET held_seconds = ?, session_started_at = ?, client = ?, project = ?, work_type = ?, billable = ?
+            WHERE id = ?;
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.exec(lastError())
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int(stmt, 1, Int32(heldSeconds))
+        sqlite3_bind_int64(stmt, 2, Int64(sessionStartedAt.timeIntervalSince1970))
+        sqlite3_bind_text(stmt, 3, client, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 4, project, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 5, workType, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_int(stmt, 6, billable ? 1 : 0)
+        sqlite3_bind_int64(stmt, 7, id)
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            throw DatabaseError.exec(lastError())
+        }
+    }
+
+    func deleteParkedSession(id: Int64) throws {
+        let sql = "DELETE FROM parked_sessions WHERE id = ?;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.exec(lastError())
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int64(stmt, 1, id)
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            throw DatabaseError.exec(lastError())
+        }
     }
 }

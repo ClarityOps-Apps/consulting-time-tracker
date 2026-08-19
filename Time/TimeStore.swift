@@ -16,6 +16,7 @@ final class TimeStore: ObservableObject {
     @Published var clients: [ClientItem] = []
     @Published var projects: [ProjectItem] = []
     @Published var entries: [TimeEntry] = []
+    @Published var parked: [ParkedSession] = []
     @Published var now = Date()
     @Published var palette = Palette()
     @Published var dateRange: DateRangeKind = .thisWeek
@@ -35,6 +36,9 @@ final class TimeStore: ObservableObject {
 
     private let db: Database
     private var tickTimer: Timer?
+    private var clockClient = ""
+    private var clockProject = ""
+    private var clockWorkType = ""
     var dataFileURL: URL { db.fileURL }
 
     init() {
@@ -46,6 +50,7 @@ final class TimeStore: ObservableObject {
         reload()
         restoreSession()
         restoreHeld()
+        reloadParked()
         startTicking()
         observeForm()
     }
@@ -115,7 +120,36 @@ final class TimeStore: ObservableObject {
         let finished = entries
             .filter { $0.startedAt >= start && $0.startedAt < end }
             .reduce(0) { $0 + $1.durationSeconds }
-        return finished + ((isRunning || isPaused) ? displaySeconds : 0)
+        let active = (isRunning || isPaused) ? displaySeconds : 0
+        let other = parked
+            .filter { $0.sessionStartedAt >= start && $0.sessionStartedAt < end }
+            .reduce(0) { $0 + $1.heldSeconds }
+        return finished + active + other
+    }
+
+    var currentIdentityKey: String {
+        ParkedSession.identityKey(client: client, project: project, workType: workType)
+    }
+
+    var otherSessions: [ParkedSession] {
+        let clockKey = ParkedSession.identityKey(client: clockClient, project: clockProject, workType: clockWorkType)
+        return parked.filter { $0.identityKey != clockKey }
+    }
+
+    func resumeParked(_ session: ParkedSession) {
+        if isRunning || isPaused {
+            if currentIdentityKey == session.identityKey {
+                start()
+                return
+            }
+            parkCurrent()
+        }
+        apply(session)
+        do { try db.deleteParkedSession(id: session.id) } catch {
+            NSLog("Time: could not drop parked session: \(error)")
+        }
+        reloadParked()
+        start()
     }
 
     func entries(in range: DateRangeKind, customStart: Date, customEnd: Date) -> [TimeEntry] {
@@ -132,17 +166,43 @@ final class TimeStore: ObservableObject {
     }
 
     func start() {
-        if isRunning { return }
-        now = Date()
-        if !isPaused {
+        rememberClient()
+        rememberProject()
+        let key = currentIdentityKey
+        let clockKey = ParkedSession.identityKey(client: clockClient, project: clockProject, workType: clockWorkType)
+        let inPlay = isRunning || isPaused
+        if inPlay && key == clockKey {
+            if isRunning { return }
+            now = Date()
+            runningStartedAt = now
+            isRunning = true
+            isPaused = false
+            persistFormAndRunning()
+            persistHeld()
+            objectWillChange.send()
+            return
+        }
+        if inPlay {
+            parkCurrent()
+        }
+        if let match = parked.first(where: { $0.identityKey == key }) {
+            apply(match)
+            do { try db.deleteParkedSession(id: match.id) } catch {
+                NSLog("Time: could not drop parked session: \(error)")
+            }
+            reloadParked()
+        } else {
+            now = Date()
             sessionStartedAt = now
             heldSeconds = 0
         }
+        clockClient = client
+        clockProject = project
+        clockWorkType = workType
+        now = Date()
         runningStartedAt = now
         isRunning = true
         isPaused = false
-        rememberClient()
-        rememberProject()
         persistFormAndRunning()
         persistHeld()
         objectWillChange.send()
@@ -194,6 +254,73 @@ final class TimeStore: ObservableObject {
         persistHeld()
         reloadEntries()
         persistForm()
+        reloadParked()
+    }
+
+    private func apply(_ session: ParkedSession) {
+        client = session.client
+        project = session.project
+        workType = session.workType
+        billable = session.billable
+        heldSeconds = session.heldSeconds
+        sessionStartedAt = session.sessionStartedAt
+        runningStartedAt = nil
+        isRunning = false
+        isPaused = true
+        clockClient = session.client
+        clockProject = session.project
+        clockWorkType = session.workType
+    }
+
+    private func parkCurrent() {
+        guard isRunning || isPaused else { return }
+        var seconds = heldSeconds
+        if isRunning, let start = runningStartedAt {
+            seconds += max(0, Int(Date().timeIntervalSince(start)))
+        }
+        let started = sessionStartedAt ?? runningStartedAt ?? Date()
+        let c = (clockClient.isEmpty && clockProject.isEmpty && clockWorkType.isEmpty ? client : clockClient).trimmingCharacters(in: .whitespacesAndNewlines)
+        let p = (clockClient.isEmpty && clockProject.isEmpty && clockWorkType.isEmpty ? project : clockProject).trimmingCharacters(in: .whitespacesAndNewlines)
+        let w = (clockClient.isEmpty && clockProject.isEmpty && clockWorkType.isEmpty ? workType : clockWorkType).trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = ParkedSession.identityKey(client: c, project: p, workType: w)
+        do {
+            if let existing = parked.first(where: { $0.identityKey == key }) {
+                try db.updateParkedSession(
+                    id: existing.id,
+                    heldSeconds: seconds,
+                    sessionStartedAt: started,
+                    client: c,
+                    project: p,
+                    workType: w,
+                    billable: billable
+                )
+            } else {
+                try db.insertParkedSession(
+                    heldSeconds: seconds,
+                    sessionStartedAt: started,
+                    client: c,
+                    project: p,
+                    workType: w,
+                    billable: billable
+                )
+            }
+        } catch {
+            NSLog("Time: could not park session: \(error)")
+        }
+        isRunning = false
+        isPaused = false
+        runningStartedAt = nil
+        sessionStartedAt = nil
+        heldSeconds = 0
+        persistHeld()
+        do { try db.clearRunningSession() } catch {
+            NSLog("Time: could not clear running session: \(error)")
+        }
+        reloadParked()
+    }
+
+    private func reloadParked() {
+        parked = db.parkedSessions()
     }
 
     func addWorkType(_ raw: String) {
@@ -444,6 +571,7 @@ final class TimeStore: ObservableObject {
         reloadClients()
         reloadProjects()
         reloadEntries()
+        reloadParked()
         loadPalette()
         workType = db.setting("work_type") ?? ""
         client = db.setting("client") ?? ""
@@ -479,6 +607,9 @@ final class TimeStore: ObservableObject {
         isRunning = true
         if archivedClientNames.contains(client) { client = "" }
         if archivedProjectNames.contains(project) { project = "" }
+        clockClient = client
+        clockProject = project
+        clockWorkType = workType
     }
 
     private func persistForm() {

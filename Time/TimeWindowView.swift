@@ -38,7 +38,27 @@ struct TimeWindowView: View {
                 .padding(.bottom, 14)
 
             timerButtons
+                .padding(.bottom, store.otherSessions.isEmpty ? 14 : 8)
+
+            if !store.otherSessions.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(store.otherSessions) { session in
+                        Button {
+                            store.resumeParked(session)
+                        } label: {
+                            HStack {
+                                Text(session.rowLabel)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(palette.quiet)
+                                    .lineLimit(1)
+                                Spacer(minLength: 0)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
                 .padding(.bottom, 14)
+            }
 
             VStack(spacing: 0) {
                 fieldRow("Work type") { workTypeControl }
