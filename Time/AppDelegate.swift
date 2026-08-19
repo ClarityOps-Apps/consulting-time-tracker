@@ -69,9 +69,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         item.button?.image = statusClockImage()
         item.button?.image?.isTemplate = true
         item.button?.imagePosition = .imageLeft
-        let menu = NSMenu()
-        menu.delegate = self
-        item.menu = menu
+        item.button?.target = self
+        item.button?.action = #selector(statusItemAction(_:))
+        item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         statusItem = item
     }
 
@@ -136,6 +136,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     @objc func stopTimer() {
         store.stop()
         refreshStatusItem()
+    }
+
+    @objc func statusItemAction(_ sender: Any?) {
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            popStatusMenu()
+            return
+        }
+        toggleTimeWindow()
+    }
+
+    private func popStatusMenu() {
+        let menu = NSMenu()
+        menuNeedsUpdate(menu)
+        guard let button = statusItem?.button else { return }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 2), in: button)
+    }
+
+    @objc func toggleTimeWindow() {
+        if let window = timeWindow, window.isVisible {
+            window.orderOut(nil)
+        } else {
+            showTimeWindow()
+        }
     }
 
     @objc func showTimeWindow() {
@@ -260,6 +283,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     private func present(_ window: NSWindow?) {
         guard let window else { return }
+        window.level = .floating
+        window.hidesOnDeactivate = false
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .moveToActiveSpace]
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -273,6 +299,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         window.backgroundColor = store.palette.nsWindow
         window.appearance = NSAppearance(named: .aqua)
         window.isReleasedWhenClosed = false
+        window.level = .floating
+        window.hidesOnDeactivate = false
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .moveToActiveSpace]
         window.delegate = self
         window.standardWindowButton(.closeButton)?.isEnabled = true
         window.standardWindowButton(.closeButton)?.isHidden = false
@@ -283,5 +312,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         sender.orderOut(nil)
         return false
+    }
+
+    func windowWillMiniaturize(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+        DispatchQueue.main.async {
+            if window.isMiniaturized {
+                window.deminiaturize(nil)
+            }
+            window.orderOut(nil)
+        }
     }
 }
