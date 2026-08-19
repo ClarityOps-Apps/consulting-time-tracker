@@ -315,7 +315,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         NSApp.setActivationPolicy(.regular)
         window.level = .floating
         window.hidesOnDeactivate = false
-        window.collectionBehavior = [.canJoinAllSpaces, .moveToActiveSpace]
+        window.collectionBehavior = .canJoinAllSpaces
         placeBelowStatusItem(window)
         window.alphaValue = 1
         window.orderFrontRegardless()
@@ -369,7 +369,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         window.isReleasedWhenClosed = false
         window.level = .floating
         window.hidesOnDeactivate = false
-        window.collectionBehavior = [.canJoinAllSpaces, .moveToActiveSpace]
+        window.collectionBehavior = .canJoinAllSpaces
         window.delegate = self
         window.standardWindowButton(.closeButton)?.isEnabled = true
         window.standardWindowButton(.closeButton)?.isHidden = false
