@@ -6,6 +6,7 @@ struct ReportView: View {
     @ObservedObject var store: TimeStore
     @State private var openClients: Set<String> = []
     @State private var openProjects: Set<String> = []
+    @State private var savedFlash = false
 
     private var palette: Palette { store.palette }
 
@@ -29,6 +30,13 @@ struct ReportView: View {
 
             DateRangeBar(store: store, showSave: true, onSave: saveCSV)
                 .padding(.top, 10)
+                .overlay(alignment: .trailing) {
+                    Text("Saved")
+                        .font(.system(size: 11))
+                        .foregroundStyle(palette.quiet)
+                        .opacity(savedFlash ? 1 : 0)
+                        .padding(.trailing, 88)
+                }
                 .padding(.bottom, 8)
 
             VStack(spacing: 2) {
@@ -166,11 +174,14 @@ struct ReportView: View {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             try store.exportCSV(entries: filtered, to: url)
+            savedFlash = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                withAnimation(.easeOut(duration: 0.35)) {
+                    savedFlash = false
+                }
+            }
         } catch {
-            let alert = NSAlert()
-            alert.messageText = "Time"
-            alert.informativeText = "Could not save the CSV."
-            alert.runModal()
+            return
         }
     }
 }
