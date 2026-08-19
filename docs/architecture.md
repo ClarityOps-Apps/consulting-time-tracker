@@ -13,13 +13,13 @@ Tables:
 - `entries` — finished intervals: start, end, duration in seconds, client, project, work type, billable
 - `work_types` — editable names and sort order
 - `running_session` — at most one in-progress interval, restored after relaunch
-- `settings` — last form fields and the four Colors values (Font, Action, Quiet, Window)
+- `settings` — last form fields
 
 No backend, no iCloud, no accounts. Each Mac keeps its own file.
 
 ## Windows
 
-AppDelegate owns four `NSWindow`s (Time and Colors ~280pt, History and Report ~400pt) and the status item. History and Report share one date range. Report CSV is written through `NSSavePanel`. Colors is opened from the Time window.
+AppDelegate owns three `NSWindow`s (Time ~280pt, History and Report ~400pt) and the status item. History and Report share one date range. Report CSV is written through `NSSavePanel`. The four look colors (Font, Action, Quiet, Window) are tokens in the app, not an admin screen.
 
 ## Out of scope for v1
 

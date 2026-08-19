@@ -24,7 +24,7 @@ SQLite lives in Application Support, never in this repo.
 - Sandboxed build: `~/Library/Containers/co.clarityops.Time/Data/Library/Application Support/Time/time.sqlite`
 - Unsandboxed / script-built app: `~/Library/Application Support/Time/time.sqlite`
 
-Hours, the work-type list, a running session, and the four Colors values are stored there.
+Hours, the work-type list, and a running session are stored there.
 
 ## Work type
 
@@ -38,8 +38,6 @@ Use **Edit list…** to add, rename, or remove names. These are starters, not a 
 - **Menu bar:** clock icon plus elapsed (`1:24` while running). Menu: Start or Stop, Show window, History, Report, Quit.
 - **History:** date range, foldable By client totals (client + hours only), chronological intervals.
 - **Report:** same date range, nested client → project → work type, **Save CSV** (client, project, work type, hours and minutes).
-- **Colors:** four wells — Font, Action, Quiet, Window. Persisted locally.
-
 Date ranges: Today, This week, Last week, This month, Choose dates…
 
 ## Bundle
