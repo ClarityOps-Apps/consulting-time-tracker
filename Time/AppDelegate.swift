@@ -13,7 +13,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
+        NSAppleEventManager.shared().setEventHandler(
+            self,
+            andSelector: #selector(handleReopenEvent(_:replyEvent:)),
+            forEventClass: AEEventClass(kCoreEventClass),
+            andEventID: AEEventID(kAEReopenApplication)
+        )
         store.onOpenWorkTypes = { [weak self] in
             self?.showWorkTypes()
         }
@@ -58,6 +63,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         showTimeWindow()
         return true
+    }
+
+    @objc func handleReopenEvent(_ event: NSAppleEventDescriptor, replyEvent: NSAppleEventDescriptor) {
+        showTimeWindow()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -156,6 +165,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     @objc func toggleTimeWindow() {
         if let window = timeWindow, window.isVisible {
             window.orderOut(nil)
+            retreatIfNoWindows()
         } else {
             showTimeWindow()
         }
@@ -209,6 +219,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     func closeWorkTypes() {
         editorWindow?.orderOut(nil)
+        retreatIfNoWindows()
     }
 
     @objc func popWorkTypeMenu() {
@@ -283,11 +294,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     private func present(_ window: NSWindow?) {
         guard let window else { return }
+        NSApp.setActivationPolicy(.regular)
         window.level = .floating
         window.hidesOnDeactivate = false
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .moveToActiveSpace]
+        if !window.isVisible || NSScreen.screens.allSatisfy({ !$0.visibleFrame.intersects(window.frame) }) {
+            window.center()
+        }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func retreatIfNoWindows() {
+        let anyVisible = [timeWindow, historyWindow, reportWindow, editorWindow, colorsWindow]
+            .compactMap { $0 }
+            .contains { $0.isVisible }
+        if !anyVisible {
+            NSApp.setActivationPolicy(.accessory)
+        }
     }
 
     private func makeWindow<V: View>(title: String, size: NSSize, root: V) -> NSWindow {
@@ -311,6 +335,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         sender.orderOut(nil)
+        retreatIfNoWindows()
         return false
     }
 
@@ -321,6 +346,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 window.deminiaturize(nil)
             }
             window.orderOut(nil)
+            self.retreatIfNoWindows()
         }
     }
 }
