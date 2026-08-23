@@ -42,12 +42,18 @@ swiftc \
 TMP_ICONSET="$ROOT/.build-AppIcon.iconset"
 rm -rf "$TMP_ICONSET"
 mkdir -p "$TMP_ICONSET"
+# Filenames must match iconutil .iconset naming (incl. 128@2x / 256@2x).
 for f in \
-  icon_16x16.png diana.k@example.org \
-  icon_32x32.png ivan.p@example.net \
-  icon_128x128.png wendy.h@example.net \
-  icon_256x256.png wendy.h@example.net \
-  icon_512x512.png walt.e@example.net
+  icon_16x16.png \
+  icon_16x16@2x.png \
+  icon_32x32.png \
+  icon_32x32@2x.png \
+  icon_128x128.png \
+  icon_128x128@2x.png \
+  icon_256x256.png \
+  icon_256x256@2x.png \
+  icon_512x512.png \
+  icon_512x512@2x.png
 do
   cp "$ICONSET_SRC/$f" "$TMP_ICONSET/$f"
 done
@@ -66,8 +72,6 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 	<key>CFBundleExecutable</key>
 	<string>Time</string>
 	<key>CFBundleIconFile</key>
-	<string>AppIcon</string>
-	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>co.clarityops.Time</string>

@@ -14,8 +14,6 @@
 	<string>6.0</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
-	<key>CFBundleIconName</key>
-	<string>AppIcon</string>
 	<key>CFBundleName</key>
 	<string>Time</string>
 	<key>CFBundlePackageType</key>
