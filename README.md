@@ -42,7 +42,7 @@ Date ranges: Today, This week, Last week, This month, Choose dates…
 
 ## Harvest
 
-Open **Harvest**. Enter Account ID and Personal access token from [id.getharvest.com/developers](https://id.getharvest.com/developers), then Connect. Pull fills Client, Project, and Work type. Send posts saved History hours for the History/Report date range. Local names stay.
+Open **Harvest**. Enter Account ID and Personal access token from [id.getharvest.com/developers](https://id.getharvest.com/developers), then Connect. Pull fills Client, Project, and Work type. Send posts saved History hours for the History/Report date range. Local names stay. While Connected, Time pulls when the Time window first comes up and about every hour, and sends a saved Stop plus the History/Report range about every hour. Pull and Send stay on the Harvest window.
 
 ## Bundle
 

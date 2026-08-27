@@ -50,6 +50,9 @@ final class TimeStore: ObservableObject {
     private let db: Database
     private var tickTimer: Timer?
     private var breatheTimer: Timer?
+    private var harvestTimer: Timer?
+    private var harvestJobs: [HarvestAutoJob] = []
+    private var didLaunchHarvestPull = false
     private var breatheStartedAt: Date?
     private var clockClient = ""
     private var clockProject = ""
@@ -296,8 +299,9 @@ final class TimeStore: ObservableObject {
             seconds += max(0, Int(end.timeIntervalSince(start)))
         }
         let start = sessionStartedAt ?? runningStartedAt ?? end
+        var savedID: Int64?
         do {
-            try db.insertEntry(
+            savedID = try db.insertEntry(
                 startedAt: start,
                 endedAt: end,
                 durationSeconds: seconds,
@@ -322,6 +326,9 @@ final class TimeStore: ObservableObject {
         reloadEntries()
         persistForm()
         reloadParked()
+        if let savedID {
+            enqueueHarvest(.sendIDs([savedID]))
+        }
     }
 
     private func apply(_ session: ParkedSession) {
@@ -824,7 +831,7 @@ final class TimeStore: ObservableObject {
                     billable: draft.billable
                 )
             } else {
-                try db.insertEntry(
+                _ = try db.insertEntry(
                     startedAt: started,
                     endedAt: ended,
                     durationSeconds: seconds,
@@ -896,6 +903,14 @@ final class TimeStore: ObservableObject {
         onOpenHarvest?()
     }
 
+    func noteTimeWindowPresented() {
+        guard !didLaunchHarvestPull else { return }
+        didLaunchHarvestPull = true
+        guard harvestConnected else { return }
+        startHarvestTimer()
+        enqueueHarvest(.pull)
+    }
+
     func connectHarvest() {
         let accountID = harvestAccountID.trimmingCharacters(in: .whitespacesAndNewlines)
         let token = harvestToken.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -911,9 +926,80 @@ final class TimeStore: ObservableObject {
     }
 
     func pullHarvest() {
+        enqueueHarvest(.pull)
+    }
+
+    func sendHarvest() {
+        enqueueHarvest(.sendRange)
+    }
+
+    func disconnectHarvest() {
+        stopHarvestTimer()
+        HarvestKeychain.clear()
+        harvestConnected = false
+        harvestBusy = false
+        harvestNote = ""
+        harvestAccountID = ""
+        harvestToken = ""
+    }
+
+    private enum HarvestAutoJob {
+        case pull
+        case sendRange
+        case sendIDs([Int64])
+    }
+
+    private func startHarvestTimer() {
+        guard harvestTimer == nil else { return }
+        let timer = Timer(timeInterval: 60 * 60, repeats: true) { [weak self] _ in
+            self?.harvestHourFired()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        harvestTimer = timer
+    }
+
+    private func stopHarvestTimer() {
+        harvestTimer?.invalidate()
+        harvestTimer = nil
+        harvestJobs.removeAll()
+    }
+
+    private func harvestHourFired() {
+        guard harvestConnected, HarvestKeychain.credentials() != nil else { return }
+        enqueueHarvest(.pull)
+        enqueueHarvest(.sendRange)
+    }
+
+    private func enqueueHarvest(_ job: HarvestAutoJob) {
+        switch job {
+        case .pull:
+            break
+        case .sendRange, .sendIDs:
+            guard harvestConnected else { return }
+        }
+        harvestJobs.append(job)
+        pumpHarvestJobs()
+    }
+
+    private func pumpHarvestJobs() {
+        guard !harvestBusy else { return }
+        guard let job = harvestJobs.first else { return }
+        harvestJobs.removeFirst()
+        switch job {
+        case .pull:
+            startHarvestPull()
+        case .sendRange:
+            startHarvestSend(entryIDs: nil)
+        case .sendIDs(let ids):
+            startHarvestSend(entryIDs: ids)
+        }
+    }
+
+    private func startHarvestPull() {
         guard let creds = HarvestKeychain.credentials() else {
             harvestConnected = false
             harvestNote = "Could not pull"
+            pumpHarvestJobs()
             return
         }
         harvestBusy = true
@@ -923,23 +1009,17 @@ final class TimeStore: ObservableObject {
         }
     }
 
-    func sendHarvest() {
-        guard harvestConnected, let creds = HarvestKeychain.credentials() else { return }
+    private func startHarvestSend(entryIDs: [Int64]?) {
+        guard harvestConnected, let creds = HarvestKeychain.credentials() else {
+            pumpHarvestJobs()
+            return
+        }
         harvestBusy = true
         harvestNote = ""
-        let plan = harvestSendPlan()
+        let plan = harvestSendPlan(entryIDs: entryIDs)
         Task { [weak self] in
             await self?.runHarvestSend(accountID: creds.accountID, token: creds.token, plan: plan)
         }
-    }
-
-    func disconnectHarvest() {
-        HarvestKeychain.clear()
-        harvestConnected = false
-        harvestBusy = false
-        harvestNote = ""
-        harvestAccountID = ""
-        harvestToken = ""
     }
 
     func applyHarvestBillableIfLinked() {
@@ -979,16 +1059,19 @@ final class TimeStore: ObservableObject {
                 if connecting {
                     self.harvestConnected = true
                     self.harvestToken = ""
+                    self.startHarvestTimer()
                 }
                 self.applyHarvestPull(pull)
                 self.harvestBusy = false
-                self.harvestNote = ""
+                self.harvestNote = "Pulled"
+                self.pumpHarvestJobs()
             }
         } catch {
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.harvestBusy = false
                 self.harvestNote = connecting && !self.harvestConnected ? "Could not connect" : "Could not pull"
+                self.pumpHarvestJobs()
             }
         }
     }
@@ -1120,10 +1203,17 @@ final class TimeStore: ObservableObject {
         var skipped: Int
     }
 
-    private func harvestSendPlan() -> HarvestSendPlan {
+    private func harvestSendPlan(entryIDs: [Int64]? = nil) -> HarvestSendPlan {
         var items: [HarvestSendItem] = []
         var skipped = 0
-        for entry in filteredEntries() {
+        let rows: [TimeEntry]
+        if let ids = entryIDs {
+            let wanted = Set(ids)
+            rows = entries.filter { wanted.contains($0.id) }
+        } else {
+            rows = filteredEntries()
+        }
+        for entry in rows {
             if harvestSendableMinutes(entry.durationSeconds) == 0 {
                 skipped += 1
                 continue
@@ -1243,6 +1333,7 @@ final class TimeStore: ObservableObject {
             } else {
                 self.harvestNote = "Sent \(sentCount) · skipped \(skippedCount)"
             }
+            self.pumpHarvestJobs()
         }
     }
 

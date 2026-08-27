@@ -264,6 +264,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             )
         }
         present(timeWindow)
+        store.noteTimeWindowPresented()
     }
 
     @objc func showHistory() {

@@ -17,7 +17,7 @@ Tables:
 
 No backend, no iCloud. Each Mac keeps its own file.
 
-Harvest connect (Personal Access Token + Account ID) lives in the Colors window. Credentials are stored in the Mac Keychain, never in SQLite or git. Pull copies active clients, projects, and tasks (Work type) into the existing lists and stores Harvest ids. Send posts saved History hours as duration hours for the History/Report date range.
+Harvest connect (Personal Access Token + Account ID) lives in the Harvest window. Credentials are stored in the Mac Keychain, never in SQLite or git. Pull copies active clients, projects, and tasks (Work type) into the existing lists and stores Harvest ids. Send posts saved History hours as duration hours for the History/Report date range. While Connected, a Timer in Time pulls once when the Time window first comes up and about every hour, and sends a saved Stop plus the current date range about every hour.
 
 ## Windows
 

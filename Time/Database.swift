@@ -416,7 +416,7 @@ final class Database {
         project: String,
         workType: String,
         billable: Bool
-    ) throws {
+    ) throws -> Int64 {
         let sql = """
             INSERT INTO entries(started_at, ended_at, duration_seconds, client, project, work_type, billable)
             VALUES(?, ?, ?, ?, ?, ?, ?);
@@ -436,6 +436,7 @@ final class Database {
         if sqlite3_step(stmt) != SQLITE_DONE {
             throw DatabaseError.exec(lastError())
         }
+        return sqlite3_last_insert_rowid(db)
     }
 
     func updateEntry(
