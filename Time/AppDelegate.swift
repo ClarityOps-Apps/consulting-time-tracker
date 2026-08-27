@@ -77,6 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             self?.popEntryProjectMenu()
         }
         buildStatusItem()
+        installHiddenEditMenu()
         showTimeWindow()
         store.objectWillChange
             .receive(on: RunLoop.main)
@@ -577,6 +578,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     @objc func showHarvest() {
+        installHiddenEditMenu()
         if harvestWindow == nil {
             harvestWindow = makeWindow(
                 title: "Harvest",
@@ -627,6 +629,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             )
         }
         window.setFrame(NSRect(origin: origin, size: size), display: true)
+    }
+
+    /// Hidden Edit menu so Cmd-X/C/V/A reach the first-responder field editor
+    /// without a dummy File/View/Window bar over the menu-bar clock.
+    private func installHiddenEditMenu() {
+        let main: NSMenu
+        if let existing = NSApp.mainMenu {
+            main = existing
+        } else {
+            main = NSMenu()
+            NSApp.mainMenu = main
+        }
+        if main.items.contains(where: { $0.submenu?.title == "Edit" }) {
+            return
+        }
+        let edit = NSMenu(title: "Edit")
+        edit.autoenablesItems = true
+        edit.addItem(NSMenuItem(title: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x"))
+        edit.addItem(NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c"))
+        edit.addItem(NSMenuItem(title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
+        edit.addItem(NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
+        let item = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
+        item.submenu = edit
+        item.isHidden = true
+        main.addItem(item)
     }
 
     private func retreatIfNoWindows() {
