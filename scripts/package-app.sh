@@ -35,7 +35,8 @@ swiftc \
   Time/HistoryView.swift \
   Time/ReportView.swift \
   Time/WorkTypeEditor.swift \
-  Time/ColorsView.swift
+  Time/ColorsView.swift \
+  Time/EntryEditor.swift
 
 # Build AppIcon.icns from the signed-off AppIcon.appiconset (Applications / Dock / About).
 # Menu bar glyph stays the separate template drawn in statusClockImage() — not this tile.

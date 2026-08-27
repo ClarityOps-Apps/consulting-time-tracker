@@ -23,6 +23,7 @@ final class TimeStore: ObservableObject {
     @Published var dateRange: DateRangeKind = .thisWeek
     @Published var customStart = Date()
     @Published var customEnd = Date()
+    @Published var editingDraft: EntryDraft?
     var onOpenWorkTypes: (() -> Void)?
     var onOpenColors: (() -> Void)?
     var onOpenTime: (() -> Void)?
@@ -34,6 +35,11 @@ final class TimeStore: ObservableObject {
     var onOpenProjectMenu: (() -> Void)?
     var onOpenProjects: (() -> Void)?
     var onOpenDateRangeMenu: (() -> Void)?
+    var onOpenEntryEditor: (() -> Void)?
+    var onCloseEntryEditor: (() -> Void)?
+    var onOpenEntryWorkTypeMenu: (() -> Void)?
+    var onOpenEntryClientMenu: (() -> Void)?
+    var onOpenEntryProjectMenu: (() -> Void)?
 
     private let db: Database
     private var tickTimer: Timer?
@@ -757,6 +763,121 @@ final class TimeStore: ObservableObject {
 
     func openDateRangeMenu() {
         onOpenDateRangeMenu?()
+    }
+
+    func openEntry(_ entry: TimeEntry) {
+        editingDraft = EntryDraft.from(entry)
+        onOpenEntryEditor?()
+    }
+
+    func openNewEntry() {
+        editingDraft = EntryDraft.blank(now: now)
+        onOpenEntryEditor?()
+    }
+
+    func updateDraft(_ mutate: (inout EntryDraft) -> Void) {
+        guard var draft = editingDraft else { return }
+        mutate(&draft)
+        editingDraft = draft
+    }
+
+    func openEntryWorkTypeMenu() {
+        onOpenEntryWorkTypeMenu?()
+    }
+
+    func openEntryClientMenu() {
+        snapDraftClient()
+        onOpenEntryClientMenu?()
+    }
+
+    func openEntryProjectMenu() {
+        snapDraftProject()
+        onOpenEntryProjectMenu?()
+    }
+
+    func saveEditingDraft() -> Bool {
+        guard let draft = editingDraft else { return false }
+        guard let seconds = draft.durationSeconds() else { return false }
+        let client = resolveListName(draft.client, kind: .client)
+        let project = resolveListName(draft.project, kind: .project)
+        let workType = draft.workType.trimmingCharacters(in: .whitespacesAndNewlines)
+        let started = startedDate(for: draft)
+        let ended = started.addingTimeInterval(TimeInterval(seconds))
+        do {
+            if let id = draft.id {
+                try db.updateEntry(
+                    id: id,
+                    startedAt: started,
+                    endedAt: ended,
+                    durationSeconds: seconds,
+                    client: client,
+                    project: project,
+                    workType: workType,
+                    billable: draft.billable
+                )
+            } else {
+                try db.insertEntry(
+                    startedAt: started,
+                    endedAt: ended,
+                    durationSeconds: seconds,
+                    client: client,
+                    project: project,
+                    workType: workType,
+                    billable: draft.billable
+                )
+            }
+            reloadEntries()
+            reloadClients()
+            reloadProjects()
+            return true
+        } catch {
+            NSLog("Time: could not save entry: \(error)")
+            return false
+        }
+    }
+
+    private func startedDate(for draft: EntryDraft) -> Date {
+        let calendar = Calendar.current
+        let day = calendar.startOfDay(for: draft.date)
+        if draft.id == nil {
+            return day
+        }
+        let time = calendar.dateComponents([.hour, .minute, .second], from: draft.startedAt)
+        return calendar.date(
+            bySettingHour: time.hour ?? 0,
+            minute: time.minute ?? 0,
+            second: time.second ?? 0,
+            of: day
+        ) ?? day
+    }
+
+    func resolveListName(_ raw: String, kind: NamedListKind) -> String {
+        switch kind {
+        case .workType:
+            return raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        case .client:
+            return resolveTypedName(raw, items: clients) { name in
+                try db.insertClient(name: name, sortOrder: clients.count)
+                reloadClients()
+            }
+        case .project:
+            return resolveTypedName(raw, items: projects) { name in
+                try db.insertProject(name: name, sortOrder: projects.count)
+                reloadProjects()
+            }
+        }
+    }
+
+    private func snapDraftClient() {
+        updateDraft { draft in
+            draft.client = resolveListName(draft.client, kind: .client)
+        }
+    }
+
+    private func snapDraftProject() {
+        updateDraft { draft in
+            draft.project = resolveListName(draft.project, kind: .project)
+        }
     }
 
     func openColors() {

@@ -19,6 +19,59 @@ struct TimeEntry: Identifiable, Hashable {
     }
 }
 
+struct EntryDraft: Equatable {
+    var id: Int64?
+    var startedAt: Date
+    var workType: String
+    var client: String
+    var project: String
+    var billable: Bool
+    var date: Date
+    var hoursText: String
+    var minutesText: String
+
+    static func from(_ entry: TimeEntry) -> EntryDraft {
+        let total = max(0, entry.durationSeconds)
+        return EntryDraft(
+            id: entry.id,
+            startedAt: entry.startedAt,
+            workType: entry.workType,
+            client: entry.client,
+            project: entry.project,
+            billable: entry.billable,
+            date: entry.startedAt,
+            hoursText: "\(total / 3600)",
+            minutesText: "\((total % 3600) / 60)"
+        )
+    }
+
+    static func blank(now: Date) -> EntryDraft {
+        EntryDraft(
+            id: nil,
+            startedAt: Calendar.current.startOfDay(for: now),
+            workType: "",
+            client: "",
+            project: "",
+            billable: false,
+            date: now,
+            hoursText: "0",
+            minutesText: "0"
+        )
+    }
+
+    func durationSeconds() -> Int? {
+        let hoursRaw = hoursText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let minutesRaw = minutesText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !hoursRaw.isEmpty, !minutesRaw.isEmpty else { return nil }
+        guard let hours = Int(hoursRaw), hours >= 0 else { return nil }
+        guard let minutes = Int(minutesRaw), minutes >= 0, minutes <= 59 else { return nil }
+        if hours > Int(Int32.max) / 3600 { return nil }
+        let total = hours * 3600 + minutes * 60
+        if total > Int(Int32.max) { return nil }
+        return total
+    }
+}
+
 struct ParkedSession: Identifiable, Hashable {
     var id: Int64
     var heldSeconds: Int

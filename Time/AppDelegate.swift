@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var clientsWindow: NSWindow?
     private var projectsWindow: NSWindow?
     private var colorsWindow: NSWindow?
+    private var entryEditorWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
     private var revealInFlight = false
     private var lastBreatheRunning = false
@@ -55,6 +56,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
         store.onOpenDateRangeMenu = { [weak self] in
             self?.popDateRangeMenu()
+        }
+        store.onOpenEntryEditor = { [weak self] in
+            self?.showEntryEditor()
+        }
+        store.onCloseEntryEditor = { [weak self] in
+            self?.closeEntryEditor()
+        }
+        store.onOpenEntryWorkTypeMenu = { [weak self] in
+            self?.popEntryWorkTypeMenu()
+        }
+        store.onOpenEntryClientMenu = { [weak self] in
+            self?.popEntryClientMenu()
+        }
+        store.onOpenEntryProjectMenu = { [weak self] in
+            self?.popEntryProjectMenu()
         }
         buildStatusItem()
         showTimeWindow()
@@ -184,6 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         clientsWindow?.backgroundColor = color
         projectsWindow?.backgroundColor = color
         colorsWindow?.backgroundColor = color
+        entryEditorWindow?.backgroundColor = color
     }
 
     @objc func resumeParked(_ sender: NSMenuItem) {
@@ -434,6 +451,103 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         store.adoptFieldsIfInPlay()
     }
 
+    @objc func showEntryEditor() {
+        if entryEditorWindow == nil {
+            entryEditorWindow = makeWindow(
+                title: "Edit",
+                size: NSSize(width: 280, height: 360),
+                root: EntryEditor(store: store) { [weak self] in
+                    self?.closeEntryEditor()
+                }
+            )
+        }
+        present(entryEditorWindow)
+    }
+
+    func closeEntryEditor() {
+        entryEditorWindow?.orderOut(nil)
+        store.editingDraft = nil
+        retreatIfNoWindows()
+    }
+
+    @objc func popEntryWorkTypeMenu() {
+        let menu = NSMenu()
+        for item in store.workTypes {
+            let row = NSMenuItem(title: item.name, action: #selector(pickEntryWorkType(_:)), keyEquivalent: "")
+            row.target = self
+            row.representedObject = item.name
+            if item.name == store.editingDraft?.workType {
+                row.state = .on
+            }
+            menu.addItem(row)
+        }
+        menu.addItem(.separator())
+        let edit = NSMenuItem(title: "Edit list…", action: #selector(showWorkTypes), keyEquivalent: "")
+        edit.target = self
+        menu.addItem(edit)
+        popMenu(menu, in: entryEditorWindow)
+    }
+
+    @objc func pickEntryWorkType(_ sender: NSMenuItem) {
+        guard let name = sender.representedObject as? String else { return }
+        store.updateDraft { $0.workType = name }
+    }
+
+    @objc func popEntryClientMenu() {
+        let menu = NSMenu()
+        for item in store.visibleClients {
+            let row = NSMenuItem(title: item.name, action: #selector(pickEntryClient(_:)), keyEquivalent: "")
+            row.target = self
+            row.representedObject = item.name
+            if item.name == store.editingDraft?.client {
+                row.state = .on
+            }
+            menu.addItem(row)
+        }
+        menu.addItem(.separator())
+        let edit = NSMenuItem(title: "Edit list…", action: #selector(showClients), keyEquivalent: "")
+        edit.target = self
+        menu.addItem(edit)
+        popMenu(menu, in: entryEditorWindow)
+    }
+
+    @objc func pickEntryClient(_ sender: NSMenuItem) {
+        guard let name = sender.representedObject as? String else { return }
+        store.updateDraft { $0.client = name }
+    }
+
+    @objc func popEntryProjectMenu() {
+        let menu = NSMenu()
+        for item in store.visibleProjects {
+            let row = NSMenuItem(title: item.name, action: #selector(pickEntryProject(_:)), keyEquivalent: "")
+            row.target = self
+            row.representedObject = item.name
+            if item.name == store.editingDraft?.project {
+                row.state = .on
+            }
+            menu.addItem(row)
+        }
+        menu.addItem(.separator())
+        let edit = NSMenuItem(title: "Edit list…", action: #selector(showProjects), keyEquivalent: "")
+        edit.target = self
+        menu.addItem(edit)
+        popMenu(menu, in: entryEditorWindow)
+    }
+
+    @objc func pickEntryProject(_ sender: NSMenuItem) {
+        guard let name = sender.representedObject as? String else { return }
+        store.updateDraft { $0.project = name }
+    }
+
+    private func popMenu(_ menu: NSMenu, in window: NSWindow?) {
+        if let event = NSApp.currentEvent, let view = window?.contentView {
+            NSMenu.popUpContextMenu(menu, with: event, for: view)
+        } else if let view = window?.contentView {
+            let point = NSPoint(x: view.bounds.maxX - 40, y: view.bounds.midY)
+            menu.popUp(positioning: nil, at: point, in: view)
+        }
+    }
+
     @objc func showColors() {
         if colorsWindow == nil {
             colorsWindow = makeWindow(
@@ -488,7 +602,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     private func retreatIfNoWindows() {
-        let anyVisible = [timeWindow, historyWindow, reportWindow, editorWindow, clientsWindow, projectsWindow, colorsWindow]
+        let anyVisible = [timeWindow, historyWindow, reportWindow, editorWindow, clientsWindow, projectsWindow, colorsWindow, entryEditorWindow]
             .compactMap { $0 }
             .contains { $0.isVisible }
         if !anyVisible {
@@ -515,6 +629,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
+        if sender === entryEditorWindow {
+            store.editingDraft = nil
+        }
         sender.orderOut(nil)
         retreatIfNoWindows()
         return false

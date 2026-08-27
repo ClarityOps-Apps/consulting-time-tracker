@@ -66,9 +66,16 @@ struct HistoryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("History")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(palette.quiet)
+            HStack {
+                Text("History")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(palette.quiet)
+                Spacer()
+                Button("Edit") { store.openNewEntry() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(palette.quiet)
+            }
 
             DateRangeBar(store: store)
                 .padding(.top, 10)
@@ -78,21 +85,33 @@ struct HistoryView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     byClientBlock
                     ForEach(filtered) { entry in
-                        VStack(alignment: .leading, spacing: 3) {
-                            HStack(alignment: .firstTextBaseline) {
-                                Text(historyDateLabel(entry.startedAt))
-                                Spacer()
-                                Text(DurationFormat.entry(entry.durationSeconds))
-                                    .monospacedDigit()
-                            }
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(palette.font)
+                        Button {
+                            store.openEntry(entry)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack(alignment: .firstTextBaseline) {
+                                    Text(historyDateLabel(entry.startedAt))
+                                    Spacer()
+                                    Text(DurationFormat.entry(entry.durationSeconds))
+                                        .monospacedDigit()
+                                }
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(palette.font)
 
-                            Text(entry.metaLine)
-                                .font(.system(size: 12))
-                                .foregroundStyle(palette.quiet)
+                                HStack(alignment: .firstTextBaseline) {
+                                    Text(entry.metaLine)
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(palette.quiet)
+                                    Spacer()
+                                    Text("Edit")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(palette.quiet)
+                                }
+                            }
+                            .padding(.vertical, 10)
+                            .contentShape(Rectangle())
                         }
-                        .padding(.vertical, 10)
+                        .buttonStyle(.plain)
                         .overlay(alignment: .top) {
                             palette.line.frame(height: 1)
                         }

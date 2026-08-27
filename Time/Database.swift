@@ -406,6 +406,39 @@ final class Database {
         }
     }
 
+    func updateEntry(
+        id: Int64,
+        startedAt: Date,
+        endedAt: Date,
+        durationSeconds: Int,
+        client: String,
+        project: String,
+        workType: String,
+        billable: Bool
+    ) throws {
+        let sql = """
+            UPDATE entries
+            SET started_at = ?, ended_at = ?, duration_seconds = ?, client = ?, project = ?, work_type = ?, billable = ?
+            WHERE id = ?;
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.exec(lastError())
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int64(stmt, 1, Int64(startedAt.timeIntervalSince1970))
+        sqlite3_bind_int64(stmt, 2, Int64(endedAt.timeIntervalSince1970))
+        sqlite3_bind_int(stmt, 3, Int32(durationSeconds))
+        sqlite3_bind_text(stmt, 4, client, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 5, project, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 6, workType, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_int(stmt, 7, billable ? 1 : 0)
+        sqlite3_bind_int64(stmt, 8, id)
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            throw DatabaseError.exec(lastError())
+        }
+    }
+
     func entries() -> [TimeEntry] {
         var stmt: OpaquePointer?
         let sql = """
