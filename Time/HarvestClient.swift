@@ -19,6 +19,7 @@ struct HarvestProject {
     var isActive: Bool
     var isBillable: Bool
     var clientName: String
+    var clientID: Int?
 }
 
 struct HarvestAssignment {
@@ -26,6 +27,8 @@ struct HarvestAssignment {
     var billable: Bool
     var projectName: String
     var workType: String
+    var projectID: Int
+    var taskID: Int
 }
 
 enum HarvestAPIError: Error {
@@ -81,7 +84,8 @@ struct HarvestAPI {
                 name: name,
                 isActive: boolValue(row["is_active"], default: true),
                 isBillable: boolValue(row["is_billable"], default: false),
-                clientName: stringValue(client?["name"]) ?? ""
+                clientName: stringValue(client?["name"]) ?? "",
+                clientID: intValue(client?["id"])
             )
         }
     }
@@ -90,13 +94,17 @@ struct HarvestAPI {
         try await pages(path: "/task_assignments?is_active=true", key: "task_assignments").compactMap { row in
             let project = row["project"] as? [String: Any]
             let task = row["task"] as? [String: Any]
-            guard let projectName = stringValue(project?["name"]), !projectName.isEmpty,
+            guard let projectID = intValue(project?["id"]),
+                  let taskID = intValue(task?["id"]),
+                  let projectName = stringValue(project?["name"]), !projectName.isEmpty,
                   let workType = stringValue(task?["name"]), !workType.isEmpty else { return nil }
             return HarvestAssignment(
                 isActive: boolValue(row["is_active"], default: true),
                 billable: boolValue(row["billable"], default: false),
                 projectName: projectName,
-                workType: workType
+                workType: workType,
+                projectID: projectID,
+                taskID: taskID
             )
         }
     }
@@ -121,13 +129,49 @@ struct HarvestAPI {
         return rows
     }
 
+    static func decimalHours(seconds: Int) -> Double {
+        let total = max(0, seconds)
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        return Double(hours) + Double(minutes) / 60.0
+    }
+
+    func createTimeEntry(projectID: Int, taskID: Int, spentDate: String, hours: Double) async throws -> Int {
+        try await sendTimeEntry(path: "/time_entries", method: "POST", projectID: projectID, taskID: taskID, spentDate: spentDate, hours: hours)
+    }
+
+    func updateTimeEntry(id: Int, projectID: Int, taskID: Int, spentDate: String, hours: Double) async throws -> Int {
+        try await sendTimeEntry(path: "/time_entries/\(id)", method: "PATCH", projectID: projectID, taskID: taskID, spentDate: spentDate, hours: hours)
+    }
+
+    private func sendTimeEntry(path: String, method: String, projectID: Int, taskID: Int, spentDate: String, hours: Double) async throws -> Int {
+        let url = try makeURL(HarvestAPI.root + path)
+        let body: [String: Any] = [
+            "project_id": projectID,
+            "task_id": taskID,
+            "spent_date": spentDate,
+            "hours": hours,
+        ]
+        let object = try await requestJSON(url, method: method, body: body)
+        guard let id = intValue(object["id"]) else { throw HarvestAPIError.decode }
+        return id
+    }
+
     private func getJSON(_ url: URL) async throws -> [String: Any] {
+        try await requestJSON(url, method: "GET", body: nil)
+    }
+
+    private func requestJSON(_ url: URL, method: String, body: [String: Any]?) async throws -> [String: Any] {
         var request = URLRequest(url: url)
-        request.httpMethod = "GET"
+        request.httpMethod = method
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue(accountID, forHTTPHeaderField: "Harvest-Account-Id")
         request.setValue(HarvestAPI.userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw HarvestAPIError.http

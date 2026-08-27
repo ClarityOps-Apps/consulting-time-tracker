@@ -119,6 +119,22 @@ final class Database {
                 PRIMARY KEY (project_name, work_type)
             );
             """)
+        try addColumn("clients", "harvest_id", "INTEGER")
+        try addColumn("projects", "harvest_id", "INTEGER")
+        try addColumn("work_types", "harvest_id", "INTEGER")
+        try addColumn("entries", "harvest_time_entry_id", "INTEGER")
+        try addColumn("entries", "sent_duration_seconds", "INTEGER")
+        try addColumn("entries", "sent_spent_date", "TEXT")
+        try addColumn("entries", "sent_project_id", "INTEGER")
+        try addColumn("entries", "sent_task_id", "INTEGER")
+        try addColumn("harvest_task_assignments", "harvest_project_id", "INTEGER")
+        try addColumn("harvest_task_assignments", "harvest_task_id", "INTEGER")
+    }
+
+    private func addColumn(_ table: String, _ column: String, _ type: String) throws {
+        if !tableHasColumn(table, column) {
+            try exec("ALTER TABLE \(table) ADD COLUMN \(column) \(type);")
+        }
     }
 
     private func ensureNameListTable(_ table: String) throws {
@@ -458,7 +474,8 @@ final class Database {
     func entries() -> [TimeEntry] {
         var stmt: OpaquePointer?
         let sql = """
-            SELECT id, started_at, ended_at, duration_seconds, client, project, work_type, billable
+            SELECT id, started_at, ended_at, duration_seconds, client, project, work_type, billable,
+                   harvest_time_entry_id, sent_duration_seconds, sent_spent_date, sent_project_id, sent_task_id
             FROM entries
             ORDER BY started_at DESC, id DESC;
             """
@@ -475,7 +492,12 @@ final class Database {
                     client: sqlite3_column_text(stmt, 4).map { String(cString: $0) } ?? "",
                     project: sqlite3_column_text(stmt, 5).map { String(cString: $0) } ?? "",
                     workType: sqlite3_column_text(stmt, 6).map { String(cString: $0) } ?? "",
-                    billable: sqlite3_column_int(stmt, 7) != 0
+                    billable: sqlite3_column_int(stmt, 7) != 0,
+                    harvestTimeEntryId: optionalInt(stmt, 8),
+                    sentDurationSeconds: optionalInt(stmt, 9),
+                    sentSpentDate: optionalString(stmt, 10),
+                    sentProjectId: optionalInt(stmt, 11),
+                    sentTaskId: optionalInt(stmt, 12)
                 )
             )
         }
@@ -652,6 +674,8 @@ final class Database {
         var projectName: String
         var workType: String
         var billable: Bool
+        var harvestProjectID: Int
+        var harvestTaskID: Int
     }
 
     func harvestProjects() -> [HarvestProjectLink] {
@@ -675,7 +699,7 @@ final class Database {
 
     func harvestAssignments() -> [HarvestAssignmentLink] {
         var stmt: OpaquePointer?
-        let sql = "SELECT project_name, work_type, billable FROM harvest_task_assignments;"
+        let sql = "SELECT project_name, work_type, billable, harvest_project_id, harvest_task_id FROM harvest_task_assignments;"
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
         defer { sqlite3_finalize(stmt) }
         var rows: [HarvestAssignmentLink] = []
@@ -684,7 +708,9 @@ final class Database {
                 HarvestAssignmentLink(
                     projectName: sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? "",
                     workType: sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? "",
-                    billable: sqlite3_column_int(stmt, 2) != 0
+                    billable: sqlite3_column_int(stmt, 2) != 0,
+                    harvestProjectID: Int(sqlite3_column_int64(stmt, 3)),
+                    harvestTaskID: Int(sqlite3_column_int64(stmt, 4))
                 )
             )
         }
@@ -726,7 +752,7 @@ final class Database {
     }
 
     private func insertHarvestAssignment(_ row: HarvestAssignmentLink) throws {
-        let sql = "INSERT INTO harvest_task_assignments(project_name, work_type, billable) VALUES(?, ?, ?);"
+        let sql = "INSERT INTO harvest_task_assignments(project_name, work_type, billable, harvest_project_id, harvest_task_id) VALUES(?, ?, ?, ?, ?);"
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             throw DatabaseError.exec(lastError())
@@ -735,8 +761,81 @@ final class Database {
         sqlite3_bind_text(stmt, 1, row.projectName, -1, SQLITE_TRANSIENT)
         sqlite3_bind_text(stmt, 2, row.workType, -1, SQLITE_TRANSIENT)
         sqlite3_bind_int(stmt, 3, row.billable ? 1 : 0)
+        sqlite3_bind_int64(stmt, 4, Int64(row.harvestProjectID))
+        sqlite3_bind_int64(stmt, 5, Int64(row.harvestTaskID))
         if sqlite3_step(stmt) != SQLITE_DONE {
             throw DatabaseError.exec(lastError())
         }
+    }
+
+    func setHarvestID(table: String, name: String, harvestID: Int) throws {
+        let sql = "UPDATE \(table) SET harvest_id = ? WHERE name = ? COLLATE NOCASE;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.exec(lastError())
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int64(stmt, 1, Int64(harvestID))
+        sqlite3_bind_text(stmt, 2, name, -1, SQLITE_TRANSIENT)
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            throw DatabaseError.exec(lastError())
+        }
+    }
+
+    func harvestIDs(table: String) -> [String: Int] {
+        var stmt: OpaquePointer?
+        let sql = "SELECT name, harvest_id FROM \(table) WHERE harvest_id IS NOT NULL AND harvest_id != 0;"
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [:] }
+        defer { sqlite3_finalize(stmt) }
+        var rows: [String: Int] = [:]
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let name = sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? ""
+            let id = Int(sqlite3_column_int64(stmt, 1))
+            if !name.isEmpty, id > 0 {
+                rows[name.lowercased()] = id
+            }
+        }
+        return rows
+    }
+
+    func markEntrySent(
+        id: Int64,
+        harvestTimeEntryId: Int,
+        durationSeconds: Int,
+        spentDate: String,
+        projectID: Int,
+        taskID: Int
+    ) throws {
+        let sql = """
+            UPDATE entries
+            SET harvest_time_entry_id = ?, sent_duration_seconds = ?, sent_spent_date = ?, sent_project_id = ?, sent_task_id = ?
+            WHERE id = ?;
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.exec(lastError())
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int64(stmt, 1, Int64(harvestTimeEntryId))
+        sqlite3_bind_int(stmt, 2, Int32(durationSeconds))
+        sqlite3_bind_text(stmt, 3, spentDate, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_int64(stmt, 4, Int64(projectID))
+        sqlite3_bind_int64(stmt, 5, Int64(taskID))
+        sqlite3_bind_int64(stmt, 6, id)
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            throw DatabaseError.exec(lastError())
+        }
+    }
+
+    private func optionalInt(_ stmt: OpaquePointer?, _ index: Int32) -> Int? {
+        guard sqlite3_column_type(stmt, index) != SQLITE_NULL else { return nil }
+        return Int(sqlite3_column_int64(stmt, index))
+    }
+
+    private func optionalString(_ stmt: OpaquePointer?, _ index: Int32) -> String? {
+        guard sqlite3_column_type(stmt, index) != SQLITE_NULL,
+              let cString = sqlite3_column_text(stmt, index) else { return nil }
+        let text = String(cString: cString)
+        return text.isEmpty ? nil : text
     }
 }

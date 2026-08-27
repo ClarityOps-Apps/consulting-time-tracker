@@ -9,6 +9,11 @@ struct TimeEntry: Identifiable, Hashable {
     var project: String
     var workType: String
     var billable: Bool
+    var harvestTimeEntryId: Int?
+    var sentDurationSeconds: Int?
+    var sentSpentDate: String?
+    var sentProjectId: Int?
+    var sentTaskId: Int?
 
     var metaLine: String {
         var parts = [displayName(client), displayName(project), displayName(workType)]

@@ -55,6 +55,11 @@ struct ColorsView: View {
                     }
                     .buttonStyle(SmallActionButtonStyle(color: store.palette.action))
                     .disabled(store.harvestBusy)
+                    Button("Send") {
+                        store.sendHarvest()
+                    }
+                    .buttonStyle(SmallActionButtonStyle(color: store.palette.action))
+                    .disabled(store.harvestBusy)
                 }
             } else {
                 Text("Token from id.getharvest.com/developers")

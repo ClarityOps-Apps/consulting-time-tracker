@@ -918,6 +918,16 @@ final class TimeStore: ObservableObject {
         }
     }
 
+    func sendHarvest() {
+        guard harvestConnected, let creds = HarvestKeychain.credentials() else { return }
+        harvestBusy = true
+        harvestNote = ""
+        let plan = harvestSendPlan()
+        Task { [weak self] in
+            await self?.runHarvestSend(accountID: creds.accountID, token: creds.token, plan: plan)
+        }
+    }
+
     func disconnectHarvest() {
         HarvestKeychain.clear()
         harvestConnected = false
@@ -945,6 +955,9 @@ final class TimeStore: ObservableObject {
 
     private var harvestProjectsByName: [String: Bool] = [:]
     private var harvestAssignments: [String: Bool] = [:]
+    private var harvestProjectIDs: [String: Int] = [:]
+    private var harvestTaskIDs: [String: Int] = [:]
+    private var harvestAssignmentIDs: [String: (projectID: Int, taskID: Int)] = [:]
 
     private static func harvestKey(_ project: String, _ workType: String) -> String {
         project.lowercased() + "\u{1e}" + workType.lowercased()
@@ -982,11 +995,16 @@ final class TimeStore: ObservableObject {
         var seenAssignments = Set<String>()
 
         for client in pull.clients where client.isActive {
-            _ = ensureHarvestName(client.name, kind: .client)
+            let local = ensureHarvestName(client.name, kind: .client)
+            persistHarvestID(table: "clients", name: local, harvestID: client.id)
         }
         for project in pull.projects where project.isActive {
             let localProject = ensureHarvestName(project.name, kind: .project)
+            persistHarvestID(table: "projects", name: localProject, harvestID: project.id)
             let localClient = project.clientName.isEmpty ? "" : ensureHarvestName(project.clientName, kind: .client)
+            if !localClient.isEmpty, let clientID = project.clientID {
+                persistHarvestID(table: "clients", name: localClient, harvestID: clientID)
+            }
             let key = localProject.lowercased()
             if seenProjects.insert(key).inserted {
                 projectLinks.append(
@@ -1000,7 +1018,8 @@ final class TimeStore: ObservableObject {
             }
         }
         for task in pull.tasks where task.isActive {
-            _ = ensureHarvestName(task.name, kind: .workType)
+            let local = ensureHarvestName(task.name, kind: .workType)
+            persistHarvestID(table: "work_types", name: local, harvestID: task.id)
         }
         for assignment in pull.assignments where assignment.isActive {
             let localProject = matchHarvestName(assignment.projectName, kind: .project)
@@ -1012,7 +1031,9 @@ final class TimeStore: ObservableObject {
                     Database.HarvestAssignmentLink(
                         projectName: localProject,
                         workType: localType,
-                        billable: assignment.billable
+                        billable: assignment.billable,
+                        harvestProjectID: assignment.projectID,
+                        harvestTaskID: assignment.taskID
                     )
                 )
             }
@@ -1050,14 +1071,173 @@ final class TimeStore: ObservableObject {
         return ""
     }
 
+    private func persistHarvestID(table: String, name: String, harvestID: Int) {
+        guard !name.isEmpty, harvestID > 0 else { return }
+        do {
+            try db.setHarvestID(table: table, name: name, harvestID: harvestID)
+        } catch {
+            NSLog("Time: could not save Harvest id")
+        }
+    }
+
     private func reloadHarvestLinks() {
         harvestProjectsByName = [:]
         harvestAssignments = [:]
+        harvestProjectIDs = db.harvestIDs(table: "projects")
+        harvestTaskIDs = db.harvestIDs(table: "work_types")
+        harvestAssignmentIDs = [:]
         for row in db.harvestProjects() {
             harvestProjectsByName[row.projectName.lowercased()] = row.isBillable
+            if harvestProjectIDs[row.projectName.lowercased()] == nil {
+                harvestProjectIDs[row.projectName.lowercased()] = row.harvestID
+            }
         }
         for row in db.harvestAssignments() {
             harvestAssignments[Self.harvestKey(row.projectName, row.workType)] = row.billable
+            if row.harvestProjectID > 0, row.harvestTaskID > 0 {
+                harvestAssignmentIDs[Self.harvestKey(row.projectName, row.workType)] = (row.harvestProjectID, row.harvestTaskID)
+            }
+        }
+    }
+
+    private struct HarvestSendItem {
+        var entryID: Int64
+        var harvestTimeEntryId: Int?
+        var projectID: Int
+        var taskID: Int
+        var spentDate: String
+        var hours: Double
+        var durationSeconds: Int
+    }
+
+    private struct HarvestSendPlan {
+        var items: [HarvestSendItem]
+        var skipped: Int
+    }
+
+    private func harvestSendPlan() -> HarvestSendPlan {
+        var items: [HarvestSendItem] = []
+        var skipped = 0
+        for entry in filteredEntries() {
+            if harvestSendableMinutes(entry.durationSeconds) == 0 {
+                skipped += 1
+                continue
+            }
+            guard let mapped = harvestMapping(for: entry) else {
+                skipped += 1
+                continue
+            }
+            let spentDate = harvestSpentDate(entry.startedAt)
+            let hours = HarvestAPI.decimalHours(seconds: entry.durationSeconds)
+            if entry.harvestTimeEntryId != nil,
+               entry.sentDurationSeconds == entry.durationSeconds,
+               entry.sentSpentDate == spentDate,
+               entry.sentProjectId == mapped.projectID,
+               entry.sentTaskId == mapped.taskID {
+                skipped += 1
+                continue
+            }
+            items.append(
+                HarvestSendItem(
+                    entryID: entry.id,
+                    harvestTimeEntryId: entry.harvestTimeEntryId,
+                    projectID: mapped.projectID,
+                    taskID: mapped.taskID,
+                    spentDate: spentDate,
+                    hours: hours,
+                    durationSeconds: entry.durationSeconds
+                )
+            )
+        }
+        return HarvestSendPlan(items: items, skipped: skipped)
+    }
+
+    private func harvestSendableMinutes(_ seconds: Int) -> Int {
+        max(0, seconds) / 60
+    }
+
+    private func harvestSpentDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar.current
+        formatter.timeZone = Calendar.current.timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    private func harvestMapping(for entry: TimeEntry) -> (projectID: Int, taskID: Int)? {
+        let projectName = entry.project.trimmingCharacters(in: .whitespacesAndNewlines)
+        let typeName = entry.workType.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !projectName.isEmpty, !typeName.isEmpty else { return nil }
+        if let assigned = harvestAssignmentIDs[Self.harvestKey(projectName, typeName)] {
+            return assigned
+        }
+        guard let projectID = harvestProjectIDs[projectName.lowercased()], projectID > 0,
+              let taskID = harvestTaskIDs[typeName.lowercased()], taskID > 0 else {
+            return nil
+        }
+        return (projectID, taskID)
+    }
+
+    private func runHarvestSend(accountID: String, token: String, plan: HarvestSendPlan) async {
+        let api = HarvestAPI(accountID: accountID, token: token)
+        var sent = 0
+        var skipped = plan.skipped
+        var transportFailed = false
+        for (index, item) in plan.items.enumerated() {
+            do {
+                let remoteID: Int
+                if let existing = item.harvestTimeEntryId {
+                    remoteID = try await api.updateTimeEntry(
+                        id: existing,
+                        projectID: item.projectID,
+                        taskID: item.taskID,
+                        spentDate: item.spentDate,
+                        hours: item.hours
+                    )
+                } else {
+                    remoteID = try await api.createTimeEntry(
+                        projectID: item.projectID,
+                        taskID: item.taskID,
+                        spentDate: item.spentDate,
+                        hours: item.hours
+                    )
+                }
+                await MainActor.run { [weak self] in
+                    do {
+                        try self?.db.markEntrySent(
+                            id: item.entryID,
+                            harvestTimeEntryId: remoteID,
+                            durationSeconds: item.durationSeconds,
+                            spentDate: item.spentDate,
+                            projectID: item.projectID,
+                            taskID: item.taskID
+                        )
+                    } catch {
+                        NSLog("Time: could not mark sent entry")
+                    }
+                }
+                sent += 1
+            } catch is HarvestAPIError {
+                skipped += 1
+            } catch {
+                transportFailed = true
+                skipped += 1 + (plan.items.count - index - 1)
+                break
+            }
+        }
+        let sentCount = sent
+        let skippedCount = skipped
+        let failed = transportFailed
+        await MainActor.run { [weak self] in
+            guard let self else { return }
+            self.reloadEntries()
+            self.harvestBusy = false
+            if failed && sentCount == 0 {
+                self.harvestNote = "Could not send"
+            } else {
+                self.harvestNote = "Sent \(sentCount) · skipped \(skippedCount)"
+            }
         }
     }
 
