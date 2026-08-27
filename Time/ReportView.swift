@@ -65,13 +65,8 @@ struct ReportView: View {
 
             HStack(spacing: 8) {
                 Spacer()
-                Button("Time") { store.openTime() }
-                    .buttonStyle(.plain)
-                Button("History") { store.openHistory() }
-                    .buttonStyle(.plain)
+                HistoryReportFooter(store: store, current: .report)
             }
-            .font(.system(size: 11))
-            .foregroundStyle(palette.quiet)
             .padding(.top, 8)
             .overlay(alignment: .top) {
                 palette.line.frame(height: 1)

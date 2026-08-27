@@ -121,16 +121,14 @@ struct HistoryView: View {
 
             HStack(spacing: 8) {
                 Text(store.dateRange.rawValue)
+                    .foregroundStyle(palette.quiet)
                 Text(DurationFormat.clock(totalSeconds))
                     .monospacedDigit()
+                    .foregroundStyle(palette.quiet)
                 Spacer()
-                Button("Time") { store.openTime() }
-                    .buttonStyle(.plain)
-                Button("Report") { store.openReport() }
-                    .buttonStyle(.plain)
+                HistoryReportFooter(store: store, current: .history)
             }
             .font(.system(size: 11))
-            .foregroundStyle(palette.quiet)
             .padding(.top, 8)
             .overlay(alignment: .top) {
                 palette.line.frame(height: 1)

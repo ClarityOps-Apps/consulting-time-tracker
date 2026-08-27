@@ -129,6 +129,40 @@ struct SmallActionButtonStyle: ButtonStyle {
     }
 }
 
+enum HistoryReportTab {
+    case none
+    case history
+    case report
+}
+
+struct HistoryReportFooter: View {
+    @ObservedObject var store: TimeStore
+    var current: HistoryReportTab
+
+    private var palette: Palette { store.palette }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            tabButton("History", tab: .history) { store.openHistory() }
+            tabButton("Report", tab: .report) { store.openReport() }
+        }
+    }
+
+    private func tabButton(_ title: String, tab: HistoryReportTab, action: @escaping () -> Void) -> some View {
+        let selected = current == tab
+        return Button {
+            if !selected {
+                action()
+            }
+        } label: {
+            Text(title)
+                .font(.system(size: 11, weight: selected ? .semibold : .regular))
+                .foregroundStyle(selected ? palette.font : palette.quiet)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 struct QuietField: ViewModifier {
     var palette: Palette
 
