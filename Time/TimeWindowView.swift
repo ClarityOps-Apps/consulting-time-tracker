@@ -140,7 +140,11 @@ struct TimeWindowView: View {
     private var projectControl: some View {
         typedListControl(
             text: $store.project,
-            onSubmit: { store.adoptFieldsIfInPlay() },
+            onSubmit: {
+                store.rememberProject()
+                store.applyHarvestBillableIfLinked()
+                store.adoptFieldsIfInPlay()
+            },
             onMenu: { store.openProjectMenu() }
         )
     }

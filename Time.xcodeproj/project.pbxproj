@@ -19,6 +19,8 @@
 		A1000000000000010000000A /* WorkTypeEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000010000000A /* WorkTypeEditor.swift */; };
 		A1000000000000010000000B /* ColorsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000010000000B /* ColorsView.swift */; };
 		A10000000000000100000020 /* EntryEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000100000020 /* EntryEditor.swift */; };
+		A10000000000000100000021 /* HarvestKeychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000100000021 /* HarvestKeychain.swift */; };
+		A10000000000000100000022 /* HarvestClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000100000022 /* HarvestClient.swift */; };
 		A1000000000000010000000C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000010000000C /* Assets.xcassets */; };
 		A1000000000000010000000D /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2000000000000010000000D /* SwiftUI.framework */; };
 		A1000000000000010000000E /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2000000000000010000000E /* AppKit.framework */; };
@@ -38,6 +40,8 @@
 		A2000000000000010000000A /* WorkTypeEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkTypeEditor.swift; sourceTree = "<group>"; };
 		A2000000000000010000000B /* ColorsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorsView.swift; sourceTree = "<group>"; };
 		A20000000000000100000020 /* EntryEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryEditor.swift; sourceTree = "<group>"; };
+		A20000000000000100000021 /* HarvestKeychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarvestKeychain.swift; sourceTree = "<group>"; };
+		A20000000000000100000022 /* HarvestClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarvestClient.swift; sourceTree = "<group>"; };
 		A2000000000000010000000C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A2000000000000010000000D /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		A2000000000000010000000E /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
@@ -85,6 +89,8 @@
 				A2000000000000010000000A /* WorkTypeEditor.swift */,
 				A2000000000000010000000B /* ColorsView.swift */,
 				A20000000000000100000020 /* EntryEditor.swift */,
+				A20000000000000100000021 /* HarvestKeychain.swift */,
+				A20000000000000100000022 /* HarvestClient.swift */,
 				A2000000000000010000000C /* Assets.xcassets */,
 				A20000000000000100000010 /* Info.plist */,
 				A20000000000000100000011 /* Time.entitlements */,
@@ -191,6 +197,8 @@
 				A1000000000000010000000A /* WorkTypeEditor.swift in Sources */,
 				A1000000000000010000000B /* ColorsView.swift in Sources */,
 				A10000000000000100000020 /* EntryEditor.swift in Sources */,
+				A10000000000000100000021 /* HarvestKeychain.swift in Sources */,
+				A10000000000000100000022 /* HarvestClient.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

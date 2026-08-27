@@ -40,6 +40,10 @@ Use **Edit list…** to add, rename, or remove names. These are starters, not a 
 - **Report:** same date range, nested client → project → work type, **Save CSV** (client, project, work type, hours and minutes).
 Date ranges: Today, This week, Last week, This month, Choose dates…
 
+## Harvest
+
+Open **Colors**. Enter Account ID and Personal access token from [id.getharvest.com/developers](https://id.getharvest.com/developers), then Connect. Pull fills Client, Project, and Work type. Local names stay. Hours are not sent back.
+
 ## Bundle
 
 - Window title: Time

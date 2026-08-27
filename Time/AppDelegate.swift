@@ -389,6 +389,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     @objc func pickWorkType(_ sender: NSMenuItem) {
         guard let name = sender.representedObject as? String else { return }
         store.workType = name
+        store.applyHarvestBillableIfLinked()
     }
 
     @objc func popClientMenu() {
@@ -448,6 +449,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     @objc func pickProject(_ sender: NSMenuItem) {
         guard let name = sender.representedObject as? String else { return }
         store.project = name
+        store.applyHarvestBillableIfLinked()
         store.adoptFieldsIfInPlay()
     }
 
@@ -490,7 +492,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     @objc func pickEntryWorkType(_ sender: NSMenuItem) {
         guard let name = sender.representedObject as? String else { return }
-        store.updateDraft { $0.workType = name }
+        store.updateDraft { draft in
+            draft.workType = name
+            if let value = store.harvestBillableDefault(project: draft.project, workType: name) {
+                draft.billable = value
+            }
+        }
     }
 
     @objc func popEntryClientMenu() {
@@ -536,7 +543,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     @objc func pickEntryProject(_ sender: NSMenuItem) {
         guard let name = sender.representedObject as? String else { return }
-        store.updateDraft { $0.project = name }
+        store.updateDraft { draft in
+            draft.project = name
+            if let value = store.harvestBillableDefault(project: name, workType: draft.workType) {
+                draft.billable = value
+            }
+        }
     }
 
     private func popMenu(_ menu: NSMenu, in window: NSWindow?) {
@@ -552,7 +564,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         if colorsWindow == nil {
             colorsWindow = makeWindow(
                 title: "Colors",
-                size: NSSize(width: 280, height: 380),
+                size: NSSize(width: 280, height: 560),
                 root: ColorsView(store: store)
             )
         }

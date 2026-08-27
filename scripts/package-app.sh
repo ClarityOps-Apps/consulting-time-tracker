@@ -23,6 +23,7 @@ swiftc \
   -framework SwiftUI \
   -framework AppKit \
   -framework Combine \
+  -framework Security \
   -lsqlite3 \
   -o "$APP/Contents/MacOS/Time" \
   Time/main.swift \
@@ -31,6 +32,8 @@ swiftc \
   Time/Models.swift \
   Time/Database.swift \
   Time/TimeStore.swift \
+  Time/HarvestKeychain.swift \
+  Time/HarvestClient.swift \
   Time/TimeWindowView.swift \
   Time/HistoryView.swift \
   Time/ReportView.swift \

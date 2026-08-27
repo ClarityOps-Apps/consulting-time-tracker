@@ -103,6 +103,22 @@ final class Database {
         try seedWorkTypesIfNeeded()
         try seedNameListIfNeeded(table: "clients", column: "client")
         try seedNameListIfNeeded(table: "projects", column: "project")
+        try exec("""
+            CREATE TABLE IF NOT EXISTS harvest_projects (
+                project_name TEXT NOT NULL COLLATE NOCASE PRIMARY KEY,
+                client_name TEXT NOT NULL DEFAULT '',
+                harvest_id INTEGER NOT NULL,
+                is_billable INTEGER NOT NULL DEFAULT 0
+            );
+            """)
+        try exec("""
+            CREATE TABLE IF NOT EXISTS harvest_task_assignments (
+                project_name TEXT NOT NULL COLLATE NOCASE,
+                work_type TEXT NOT NULL COLLATE NOCASE,
+                billable INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (project_name, work_type)
+            );
+            """)
     }
 
     private func ensureNameListTable(_ table: String) throws {
@@ -620,6 +636,105 @@ final class Database {
         }
         defer { sqlite3_finalize(stmt) }
         sqlite3_bind_int64(stmt, 1, id)
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            throw DatabaseError.exec(lastError())
+        }
+    }
+
+    struct HarvestProjectLink {
+        var projectName: String
+        var clientName: String
+        var harvestID: Int
+        var isBillable: Bool
+    }
+
+    struct HarvestAssignmentLink {
+        var projectName: String
+        var workType: String
+        var billable: Bool
+    }
+
+    func harvestProjects() -> [HarvestProjectLink] {
+        var stmt: OpaquePointer?
+        let sql = "SELECT project_name, client_name, harvest_id, is_billable FROM harvest_projects;"
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        var rows: [HarvestProjectLink] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            rows.append(
+                HarvestProjectLink(
+                    projectName: sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? "",
+                    clientName: sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? "",
+                    harvestID: Int(sqlite3_column_int64(stmt, 2)),
+                    isBillable: sqlite3_column_int(stmt, 3) != 0
+                )
+            )
+        }
+        return rows
+    }
+
+    func harvestAssignments() -> [HarvestAssignmentLink] {
+        var stmt: OpaquePointer?
+        let sql = "SELECT project_name, work_type, billable FROM harvest_task_assignments;"
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        var rows: [HarvestAssignmentLink] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            rows.append(
+                HarvestAssignmentLink(
+                    projectName: sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? "",
+                    workType: sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? "",
+                    billable: sqlite3_column_int(stmt, 2) != 0
+                )
+            )
+        }
+        return rows
+    }
+
+    func replaceHarvestLinks(projects: [HarvestProjectLink], assignments: [HarvestAssignmentLink]) throws {
+        try exec("BEGIN IMMEDIATE;")
+        do {
+            try exec("DELETE FROM harvest_projects;")
+            try exec("DELETE FROM harvest_task_assignments;")
+            for row in projects {
+                try insertHarvestProject(row)
+            }
+            for row in assignments {
+                try insertHarvestAssignment(row)
+            }
+            try exec("COMMIT;")
+        } catch {
+            try? exec("ROLLBACK;")
+            throw error
+        }
+    }
+
+    private func insertHarvestProject(_ row: HarvestProjectLink) throws {
+        let sql = "INSERT INTO harvest_projects(project_name, client_name, harvest_id, is_billable) VALUES(?, ?, ?, ?);"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.exec(lastError())
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, row.projectName, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 2, row.clientName, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_int64(stmt, 3, Int64(row.harvestID))
+        sqlite3_bind_int(stmt, 4, row.isBillable ? 1 : 0)
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            throw DatabaseError.exec(lastError())
+        }
+    }
+
+    private func insertHarvestAssignment(_ row: HarvestAssignmentLink) throws {
+        let sql = "INSERT INTO harvest_task_assignments(project_name, work_type, billable) VALUES(?, ?, ?);"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.exec(lastError())
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, row.projectName, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 2, row.workType, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_int(stmt, 3, row.billable ? 1 : 0)
         if sqlite3_step(stmt) != SQLITE_DONE {
             throw DatabaseError.exec(lastError())
         }

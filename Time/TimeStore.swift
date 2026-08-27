@@ -20,6 +20,11 @@ final class TimeStore: ObservableObject {
     @Published var now = Date()
     @Published var breathe = 0.0
     @Published var palette = Palette()
+    @Published var harvestConnected = false
+    @Published var harvestBusy = false
+    @Published var harvestNote = ""
+    @Published var harvestAccountID = ""
+    @Published var harvestToken = ""
     @Published var dateRange: DateRangeKind = .thisWeek
     @Published var customStart = Date()
     @Published var customEnd = Date()
@@ -60,6 +65,8 @@ final class TimeStore: ObservableObject {
         restoreSession()
         restoreHeld()
         reloadParked()
+        reloadHarvestLinks()
+        harvestConnected = HarvestKeychain.credentials() != nil
         startTicking()
         if isRunning { startBreathe() }
         observeForm()
@@ -882,6 +889,176 @@ final class TimeStore: ObservableObject {
 
     func openColors() {
         onOpenColors?()
+    }
+
+    func connectHarvest() {
+        let accountID = harvestAccountID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let token = harvestToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !accountID.isEmpty, !token.isEmpty else {
+            harvestNote = "Could not connect"
+            return
+        }
+        harvestBusy = true
+        harvestNote = ""
+        Task { [weak self] in
+            await self?.runHarvestPull(accountID: accountID, token: token, connecting: true)
+        }
+    }
+
+    func pullHarvest() {
+        guard let creds = HarvestKeychain.credentials() else {
+            harvestConnected = false
+            harvestNote = "Could not pull"
+            return
+        }
+        harvestBusy = true
+        harvestNote = ""
+        Task { [weak self] in
+            await self?.runHarvestPull(accountID: creds.accountID, token: creds.token, connecting: false)
+        }
+    }
+
+    func disconnectHarvest() {
+        HarvestKeychain.clear()
+        harvestConnected = false
+        harvestBusy = false
+        harvestNote = ""
+        harvestAccountID = ""
+        harvestToken = ""
+    }
+
+    func applyHarvestBillableIfLinked() {
+        if let value = harvestBillableDefault(project: project, workType: workType) {
+            billable = value
+        }
+    }
+
+    func harvestBillableDefault(project: String, workType: String) -> Bool? {
+        let projectName = project.trimmingCharacters(in: .whitespacesAndNewlines)
+        let typeName = workType.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !projectName.isEmpty else { return nil }
+        if !typeName.isEmpty, let assigned = harvestAssignments[Self.harvestKey(projectName, typeName)] {
+            return assigned
+        }
+        return harvestProjectsByName[projectName.lowercased()]
+    }
+
+    private var harvestProjectsByName: [String: Bool] = [:]
+    private var harvestAssignments: [String: Bool] = [:]
+
+    private static func harvestKey(_ project: String, _ workType: String) -> String {
+        project.lowercased() + "\u{1e}" + workType.lowercased()
+    }
+
+    private func runHarvestPull(accountID: String, token: String, connecting: Bool) async {
+        do {
+            let pull = try await HarvestAPI(accountID: accountID, token: token).pull()
+            if connecting {
+                try HarvestKeychain.save(accountID: accountID, token: token)
+            }
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                if connecting {
+                    self.harvestConnected = true
+                    self.harvestToken = ""
+                }
+                self.applyHarvestPull(pull)
+                self.harvestBusy = false
+                self.harvestNote = ""
+            }
+        } catch {
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.harvestBusy = false
+                self.harvestNote = connecting && !self.harvestConnected ? "Could not connect" : "Could not pull"
+            }
+        }
+    }
+
+    private func applyHarvestPull(_ pull: HarvestPull) {
+        var projectLinks: [Database.HarvestProjectLink] = []
+        var assignmentLinks: [Database.HarvestAssignmentLink] = []
+        var seenProjects = Set<String>()
+        var seenAssignments = Set<String>()
+
+        for client in pull.clients where client.isActive {
+            _ = ensureHarvestName(client.name, kind: .client)
+        }
+        for project in pull.projects where project.isActive {
+            let localProject = ensureHarvestName(project.name, kind: .project)
+            let localClient = project.clientName.isEmpty ? "" : ensureHarvestName(project.clientName, kind: .client)
+            let key = localProject.lowercased()
+            if seenProjects.insert(key).inserted {
+                projectLinks.append(
+                    Database.HarvestProjectLink(
+                        projectName: localProject,
+                        clientName: localClient,
+                        harvestID: project.id,
+                        isBillable: project.isBillable
+                    )
+                )
+            }
+        }
+        for task in pull.tasks where task.isActive {
+            _ = ensureHarvestName(task.name, kind: .workType)
+        }
+        for assignment in pull.assignments where assignment.isActive {
+            let localProject = matchHarvestName(assignment.projectName, kind: .project)
+            let localType = matchHarvestName(assignment.workType, kind: .workType)
+            guard !localProject.isEmpty, !localType.isEmpty else { continue }
+            let key = Self.harvestKey(localProject, localType)
+            if seenAssignments.insert(key).inserted {
+                assignmentLinks.append(
+                    Database.HarvestAssignmentLink(
+                        projectName: localProject,
+                        workType: localType,
+                        billable: assignment.billable
+                    )
+                )
+            }
+        }
+        do {
+            try db.replaceHarvestLinks(projects: projectLinks, assignments: assignmentLinks)
+        } catch {
+            NSLog("Time: could not save Harvest names")
+            harvestNote = "Could not pull"
+        }
+        reloadHarvestLinks()
+    }
+
+    @discardableResult
+    private func ensureHarvestName(_ raw: String, kind: NamedListKind) -> String {
+        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return "" }
+        let existing = items(for: kind)
+        if let match = existing.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
+            if match.archived {
+                unhideItem(match, kind: kind)
+            }
+            return match.name
+        }
+        addItem(name, kind: kind)
+        return name
+    }
+
+    private func matchHarvestName(_ raw: String, kind: NamedListKind) -> String {
+        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return "" }
+        if let match = items(for: kind).first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
+            return match.name
+        }
+        return ""
+    }
+
+    private func reloadHarvestLinks() {
+        harvestProjectsByName = [:]
+        harvestAssignments = [:]
+        for row in db.harvestProjects() {
+            harvestProjectsByName[row.projectName.lowercased()] = row.isBillable
+        }
+        for row in db.harvestAssignments() {
+            harvestAssignments[Self.harvestKey(row.projectName, row.workType)] = row.billable
+        }
     }
 
     func persistPalette() {

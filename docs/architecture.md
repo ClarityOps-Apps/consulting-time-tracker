@@ -15,7 +15,9 @@ Tables:
 - `running_session` — at most one in-progress interval, restored after relaunch
 - `settings` — last form fields
 
-No backend, no iCloud, no accounts. Each Mac keeps its own file.
+No backend, no iCloud. Each Mac keeps its own file.
+
+Harvest connect (Personal Access Token + Account ID) lives in the Colors window. Credentials are stored in the Mac Keychain, never in SQLite or git. Pull copies active clients, projects, and tasks (Work type) into the existing lists. Hours are not sent back.
 
 ## Windows
 
