@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var clientsWindow: NSWindow?
     private var projectsWindow: NSWindow?
     private var colorsWindow: NSWindow?
+    private var harvestWindow: NSWindow?
     private var entryEditorWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
     private var revealInFlight = false
@@ -29,6 +30,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
         store.onOpenColors = { [weak self] in
             self?.showColors()
+        }
+        store.onOpenHarvest = { [weak self] in
+            self?.showHarvest()
         }
         store.onOpenTime = { [weak self] in
             self?.showTimeWindow()
@@ -200,6 +204,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         clientsWindow?.backgroundColor = color
         projectsWindow?.backgroundColor = color
         colorsWindow?.backgroundColor = color
+        harvestWindow?.backgroundColor = color
         entryEditorWindow?.backgroundColor = color
     }
 
@@ -564,11 +569,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         if colorsWindow == nil {
             colorsWindow = makeWindow(
                 title: "Colors",
-                size: NSSize(width: 280, height: 560),
+                size: NSSize(width: 280, height: 340),
                 root: ColorsView(store: store)
             )
         }
         present(colorsWindow)
+    }
+
+    @objc func showHarvest() {
+        if harvestWindow == nil {
+            harvestWindow = makeWindow(
+                title: "Harvest",
+                size: NSSize(width: 280, height: 280),
+                root: HarvestView(store: store)
+            )
+        }
+        present(harvestWindow)
     }
 
     @objc func quit() {
@@ -614,7 +630,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     private func retreatIfNoWindows() {
-        let anyVisible = [timeWindow, historyWindow, reportWindow, editorWindow, clientsWindow, projectsWindow, colorsWindow, entryEditorWindow]
+        let anyVisible = [timeWindow, historyWindow, reportWindow, editorWindow, clientsWindow, projectsWindow, colorsWindow, harvestWindow, entryEditorWindow]
             .compactMap { $0 }
             .contains { $0.isVisible }
         if !anyVisible {

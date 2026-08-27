@@ -11,12 +11,20 @@ struct TimeWindowView: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(palette.quiet)
                 Spacer()
-                Button("Colors") {
-                    store.openColors()
+                HStack(spacing: 10) {
+                    Button("Harvest") {
+                        store.openHarvest()
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(palette.quiet)
+                    Button("Colors") {
+                        store.openColors()
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(palette.quiet)
                 }
-                .buttonStyle(.plain)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(palette.quiet)
             }
 
             clockLabel

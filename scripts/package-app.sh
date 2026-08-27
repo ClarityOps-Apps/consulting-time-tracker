@@ -39,6 +39,7 @@ swiftc \
   Time/ReportView.swift \
   Time/WorkTypeEditor.swift \
   Time/ColorsView.swift \
+  Time/HarvestView.swift \
   Time/EntryEditor.swift
 
 # Build AppIcon.icns from the signed-off AppIcon.appiconset (Applications / Dock / About).

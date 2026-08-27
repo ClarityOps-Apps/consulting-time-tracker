@@ -31,6 +31,7 @@ final class TimeStore: ObservableObject {
     @Published var editingDraft: EntryDraft?
     var onOpenWorkTypes: (() -> Void)?
     var onOpenColors: (() -> Void)?
+    var onOpenHarvest: (() -> Void)?
     var onOpenTime: (() -> Void)?
     var onOpenHistory: (() -> Void)?
     var onOpenReport: (() -> Void)?
@@ -889,6 +890,10 @@ final class TimeStore: ObservableObject {
 
     func openColors() {
         onOpenColors?()
+    }
+
+    func openHarvest() {
+        onOpenHarvest?()
     }
 
     func connectHarvest() {
